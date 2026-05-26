@@ -1,0 +1,31 @@
+/*
+ * Boojy SHARED tokens — identical across the product family (Audio, Notes, Design).
+ * Only the accent differs per product; see accent.design.css.
+ * Extractable to a @boojy/tokens package later without changes.
+ */
+@theme {
+  /* Surfaces (dark, descending elevation) */
+  --color-editor: #0e0f14;
+  --color-darkest: #13151c;
+  --color-chrome: #2c2c32;
+  --color-panel: #272a38;
+  --color-elevated: #292b36;
+  --color-card: #353845;
+  --color-divider: #3a3d4a;
+  --color-hover: #4a4d5a;
+
+  /* Text */
+  --color-fg: #e8eaf0;
+  --color-fg-dim: #9b9eb0;
+  --color-fg-faint: #646880;
+
+  /* Semantic (fixed across themes) */
+  --color-success: #4caf50;
+  --color-warn: #ffc107;
+  --color-error: #ff5722;
+
+  /* Type */
+  --font-sans: "Inter", "SF Pro Text", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial,
+    sans-serif;
+  --font-mono: "JetBrains Mono", "SF Mono", ui-monospace, Menlo, monospace;
+}

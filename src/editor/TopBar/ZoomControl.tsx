@@ -1,0 +1,24 @@
+import { Minus, Plus } from "lucide-react"
+
+interface ZoomControlProps {
+  zoom: number
+  onZoomIn: () => void
+  onZoomOut: () => void
+}
+
+const stepBtn =
+  "flex size-6 items-center justify-center rounded text-fg-dim transition-colors hover:bg-hover hover:text-fg"
+
+export function ZoomControl({ zoom, onZoomIn, onZoomOut }: ZoomControlProps) {
+  return (
+    <div className="flex items-center gap-1 rounded-[7px] border border-divider bg-darkest p-0.5">
+      <button type="button" onClick={onZoomOut} aria-label="Zoom out" className={stepBtn}>
+        <Minus size={14} />
+      </button>
+      <div className="min-w-12 text-center font-mono text-fg-dim text-xs">{zoom}%</div>
+      <button type="button" onClick={onZoomIn} aria-label="Zoom in" className={stepBtn}>
+        <Plus size={14} />
+      </button>
+    </div>
+  )
+}

@@ -1,0 +1,10 @@
+/*
+ * PER-PRODUCT accent — Boojy Design = muted amber.
+ * This is the single swap point: replace this file to reskin for another
+ * Boojy product (e.g. Audio = blue). Nothing else needs to change.
+ */
+@theme {
+  --color-accent: #e89940;
+  --color-accent-hover: #f0ad5e;
+  --color-accent-dim: rgb(232 153 64 / 0.18);
+}
