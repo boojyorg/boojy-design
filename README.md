@@ -1,7 +1,7 @@
-# Boojy Design — V1 shell
+# Boojy Design — web image editor
 
-A pixel-faithful build of the **V1 "Classic"** Boojy Design editor UI (spec v0.1.2):
-top bar, left tool rail, canvas, and collapsible right sidebar.
+A web image editor built on the **V1 "Classic"** layout (spec v0.1.2): top bar, left tool
+rail, canvas, and collapsible right sidebar.
 
 > **Status: active side-project.** The V1 UI shell shipped and is live, and the design
 > direction is confirmed. The Konva canvas engine has now landed: a raster **brush and
@@ -12,15 +12,18 @@ top bar, left tool rail, canvas, and collapsible right sidebar.
 
 ## Stack
 
-Vite 8 · React 19 · TypeScript 6 (strict) · Tailwind v4 · shadcn-style Radix
-primitives · Lucide · Vitest + Testing Library · Storybook · Biome · pnpm.
+Vite 8 · React 19 · TypeScript 6 (strict) · **Konva** (canvas engine) · Tailwind v4 ·
+shadcn-style Radix primitives · react-colorful · dnd-kit · Lucide · Vitest + Testing Library
+(+ @napi-rs/canvas for real-canvas pixel tests) · Storybook · Biome · pnpm.
 
 ## Scripts
 
 | Command | What it does |
 | --- | --- |
 | `pnpm dev` | Run the editor locally (Vite) |
-| `pnpm test` | Run the interaction tests (Vitest + RTL) |
+| `pnpm test` | Run all tests (Vitest — jsdom shell + node real-canvas projects) |
+| `pnpm test:coverage` | Tests with a coverage report |
+| `pnpm typecheck` | Type-check only (`tsc -b --noEmit`) |
 | `pnpm lint` | Biome lint + format check |
 | `pnpm format` | Biome auto-format |
 | `pnpm storybook` | Component catalogue on :6006 |

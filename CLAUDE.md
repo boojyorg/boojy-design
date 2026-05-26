@@ -9,8 +9,9 @@ This repo began as the **V1 "Classic" UI shell** — a pixel-faithful build of t
 layout (top bar, left tool rail, canvas area, right sidebar) with mock interactivity. That
 shell shipped and is live, and the design direction is **confirmed**, so this is now the
 **foundation for an actively-developed app**, not a throwaway. The Konva canvas engine has
-now landed — a raster brush and eraser paint real pixels behind the canvas seam (see
-"Engine decision" below); the MVP paint loop continues from there.
+landed and the **MVP paint loop is in place** — paint/erase in any colour across layers
+(reorder/rename/duplicate), undo/redo, image import, PNG export — all behind the canvas seam
+(see "Engine decision" and "Roadmap" below). Next is the document model + Zustand graduation.
 
 Two things that still shape any change:
 - **The canvas is a seam.** `src/editor/Canvas/CanvasStage.tsx` mounts the imperative Konva
@@ -25,9 +26,11 @@ Two things that still shape any change:
 
 ```bash
 pnpm dev              # run the editor (Vite) — the user runs this; don't auto-start it
-pnpm test             # Vitest run (jsdom)
+pnpm test             # Vitest run — both projects (dom = jsdom, node = real-canvas pixel)
 pnpm test:watch       # Vitest watch
+pnpm test:coverage    # Vitest run with v8 coverage (no enforced threshold)
 pnpm exec vitest run -t "selects a tool"   # run a single test by name
+pnpm typecheck        # tsc -b --noEmit (type-check only; also the pre-commit gate)
 pnpm lint             # Biome check (lint + format + import order)
 pnpm format           # Biome auto-fix
 pnpm build            # tsc -b (typecheck) + vite build
