@@ -3,12 +3,12 @@
 A pixel-faithful build of the **V1 "Classic"** Boojy Design editor UI (spec v0.1.2):
 top bar, left tool rail, placeholder canvas, and collapsible right sidebar.
 
-> **This is a validation artifact, not production code.** There is no canvas
-> engine — no Konva, no brush pipeline, no file format. The canvas is a static
-> placeholder behind a clean seam (`src/editor/Canvas/CanvasStage.tsx`). The
-> point is to sit with the real chrome in a browser before committing to the
-> engine. What's disposable: the state wiring (`useEditorState`) and the canvas.
-> What carries forward: the component library and the design tokens.
+> **Status: active side-project.** The V1 UI shell shipped and is live, and the design
+> direction is confirmed — so this is now the foundation for an incrementally-built app,
+> not a throwaway. There's no canvas engine *yet*: the canvas is a static placeholder
+> behind a clean seam (`src/editor/Canvas/CanvasStage.tsx`), and Konva (confirmed by a
+> perf spike) is the next thing in. State is a local reducer for now and graduates to
+> Zustand as the engine lands.
 
 ## Stack
 
@@ -30,12 +30,14 @@ primitives · Lucide · Vitest + Testing Library · Storybook · Biome · pnpm.
 ## Layout
 
 - `src/editor/` — the V1 shell, by region (`TopBar/`, `LeftRail/`, `Canvas/`, `RightSidebar/`).
-- `src/editor/state/useEditorState.ts` — disposable local reducer (no Zustand yet).
+- `src/editor/state/useEditorState.ts` — local reducer (graduates to Zustand with the engine).
 - `src/components/` — reusable primitives (+ `ui/` shadcn-style Radix wrappers).
 - `src/theme/base.tokens.css` — shared Boojy tokens; `accent.design.css` — the per-product amber (the single swap point for other Boojy products).
 
-## What's intentionally deferred
+## Roadmap
 
-Move tool + raster transforms (v0.5), Text tool (v0.5), eyedropper (v0.5), and
-the entire canvas engine (gated behind a 1-day Konva spike). Non-MVP tools are
-shown in the rail but dimmed with a "coming in v0.5" tooltip.
+Next: the canvas engine (Konva — spike-confirmed), then the MVP paint loop (raster
+brush/eraser, image import, layers, PNG export). After MVP (v0.5+): Move tool + raster
+transforms, Text, eyedropper, blend modes. Non-MVP tools already appear in the rail,
+dimmed with a "coming in v0.5" tooltip. Sequenced, not piled on at once — the 8-feature
+MVP cap is the discipline lever.

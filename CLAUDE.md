@@ -4,19 +4,21 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is (read first)
 
-Boojy Design is a web image editor. This repo is the **V1 "Classic" UI shell** — a
-pixel-faithful build of the chosen layout (top bar, left tool rail, canvas area,
-right sidebar) with **mock interactivity only**. It is a **validation artifact, not
-production**: there is no canvas engine (no Konva, no brush pipeline, no file
-format). Treat it as throwaway until the engine is greenlit.
+Boojy Design is a web image editor, built incrementally as an **active side-project**.
+This repo began as the **V1 "Classic" UI shell** — a pixel-faithful build of the chosen
+layout (top bar, left tool rail, canvas area, right sidebar) with mock interactivity. That
+shell shipped and is live, and the design direction is **confirmed**, so this is now the
+**foundation for an actively-developed app**, not a throwaway. There's no canvas engine
+*yet*; building it (Konva — see "Engine decision" below) is the next step.
 
-Two consequences that should shape any change:
-- **The canvas is a seam, not a feature.** `src/editor/Canvas/CanvasStage.tsx` renders
-  a static placeholder. The real rendering engine plugs in *there* and the surrounding
-  chrome should not need to change. Don't scatter canvas/engine logic elsewhere.
-- **State is deliberately disposable.** All editor state is one `useReducer`
-  (`src/editor/state/useEditorState.ts`). **Do not add Zustand, persistence, or a
-  document schema** — those are engine-phase and will replace this hook wholesale.
+Two things that still shape any change:
+- **The canvas is a seam.** `src/editor/Canvas/CanvasStage.tsx` renders a static
+  placeholder today; the Konva engine plugs in *there*. Keep canvas/engine logic behind
+  that seam — don't scatter it through the chrome.
+- **State is a local reducer for now.** All editor state is one `useReducer`
+  (`src/editor/state/useEditorState.ts`). It graduates to the planned Zustand stores
+  (document / undo / viewport) *as* engine + document state lands — introduce those with
+  that work, not as a speculative refactor of the current shell.
 
 ## Commands
 
@@ -80,11 +82,15 @@ hot path clears 60fps at 2K/50 layers even with a naive single-composite redraw 
 - The **memory ceiling is unvalidated** (the spike's heap metric missed canvas backing
   stores, ~800MB for 50×2K). Keep the 50-layer cap; tiling/dirty-tracking is later.
 
-**The engine build itself is still deferred** (design-doc §12: revisit ~July). Don't start
-it without an explicit ask.
+**The engine is now in active development** — the project is no longer parked until July;
+it's being built incrementally as a side-project. Start with the brush hot path on the
+naive composite (notes above), and keep scope MVP-disciplined (see Roadmap).
 
-## Deferred (do not build without an explicit ask)
+## Roadmap (sequence intentionally — confirm scope before starting a new item)
 
-The canvas engine (Konva, decision above), Zustand stores, real persistence/file format,
-the Move/transform tool, eyedropper, and the Text tool are all **v0.5+ / engine-phase**.
-Adding any of them to the shell is scope creep.
+Rough order, MVP first: canvas engine (Konva, **brush hot path first**) → document/layer
+model + Zustand stores → raster brush/eraser → image import → layer ops → PNG export.
+Then v0.5+: Move/transform tool, Text tool, eyedropper, blend modes, persistence/`.design`
+file format. These aren't forbidden — they're sequenced. Don't pile features onto the shell
+all at once; the **8-feature MVP cap** is the discipline lever. As a side-project this sits
+behind Igni / Boojy Audio / DELE — keep changes small and shippable.
