@@ -159,4 +159,22 @@ describe("EditorV1 shell", () => {
     fireEvent.keyDown(document.body, { key: "]" })
     expect(screen.getByText("35")).toBeInTheDocument()
   })
+
+  it("renames a layer inline via double-click", () => {
+    renderEditor()
+    fireEvent.doubleClick(screen.getByText("Layer 4"))
+    const input = screen.getByRole("textbox", { name: "Rename Layer 4" })
+    fireEvent.change(input, { target: { value: "Sky" } })
+    fireEvent.keyDown(input, { key: "Enter" })
+    expect(screen.getByRole("option", { name: "Sky" })).toBeInTheDocument()
+    expect(screen.queryByRole("option", { name: "Layer 4" })).not.toBeInTheDocument()
+  })
+
+  it("duplicates the active layer above itself", () => {
+    renderEditor()
+    expect(screen.getAllByRole("option")).toHaveLength(4)
+    fireEvent.click(screen.getByRole("button", { name: "Duplicate layer" }))
+    expect(screen.getAllByRole("option")).toHaveLength(5)
+    expect(screen.getByRole("option", { name: "Layer 4 copy", selected: true })).toBeInTheDocument()
+  })
 })

@@ -306,6 +306,18 @@ export class CanvasEngine {
     this.layer?.batchDraw()
   }
 
+  /** Copy one layer's pixels into another (layer duplicate). Pixels only — no history. */
+  duplicateLayerPixels(fromId: string, toId: string) {
+    const from = this.nodes.get(fromId)
+    const to = this.nodes.get(toId)
+    if (!from || !to) return
+    to.ctx.globalCompositeOperation = "source-over"
+    to.ctx.globalAlpha = 1
+    to.ctx.clearRect(0, 0, DOC_WIDTH, DOC_HEIGHT)
+    to.ctx.drawImage(from.canvas, 0, 0)
+    this.layer?.batchDraw()
+  }
+
   // ── internals ──────────────────────────────────────────────────────────────
 
   private notifyHistory() {

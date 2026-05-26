@@ -11,6 +11,9 @@ interface RightSidebarProps {
   onToggleLayer: (id: string) => void
   onAddLayer: () => void
   onDeleteLayer: () => void
+  onRenameLayer: (id: string, name: string) => void
+  onDuplicateLayer: (id: string) => void
+  onMoveLayer: (id: string, toIndex: number) => void
 }
 
 /**
@@ -27,6 +30,9 @@ export function RightSidebar({
   onToggleLayer,
   onAddLayer,
   onDeleteLayer,
+  onRenameLayer,
+  onDuplicateLayer,
+  onMoveLayer,
 }: RightSidebarProps) {
   return (
     <div
@@ -54,6 +60,9 @@ export function RightSidebar({
           onToggle={onToggleLayer}
           onAdd={onAddLayer}
           onDelete={onDeleteLayer}
+          onRename={onRenameLayer}
+          onDuplicate={onDuplicateLayer}
+          onMoveTo={onMoveLayer}
         />
       </div>
     </div>

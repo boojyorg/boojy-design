@@ -3,6 +3,7 @@ import { TooltipProvider } from "@/components/ui/tooltip"
 import { CanvasStage, type CanvasStageHandle } from "@/editor/Canvas/CanvasStage"
 import { LeftRail } from "@/editor/LeftRail/LeftRail"
 import { RightSidebar } from "@/editor/RightSidebar/RightSidebar"
+import { newLayerId } from "@/editor/state/ids"
 import { useEditorState } from "@/editor/state/useEditorState"
 import { TopBar } from "@/editor/TopBar/TopBar"
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts"
@@ -22,6 +23,16 @@ export function EditorV1() {
     if (file) stageRef.current?.importImage(file, file.name)
     e.target.value = "" // let the same file be re-imported
   }, [])
+  const onDuplicateLayer = useCallback(
+    (id: string) => {
+      // Generate the new id here so the engine can copy pixels into it after the reducer
+      // adds the layer (stash first, then dispatch — same ordering as image import).
+      const dupId = newLayerId()
+      stageRef.current?.stashDuplicate(id, dupId)
+      dispatch({ type: "duplicateLayer", id, newId: dupId })
+    },
+    [dispatch],
+  )
   useKeyboardShortcuts(dispatch, { onExport, onUndo, onRedo, onOpen })
 
   return (
@@ -85,6 +96,9 @@ export function EditorV1() {
             onToggleLayer={(id) => dispatch({ type: "toggleLayer", id })}
             onAddLayer={() => dispatch({ type: "addLayer" })}
             onDeleteLayer={() => dispatch({ type: "deleteActiveLayer" })}
+            onRenameLayer={(id, name) => dispatch({ type: "renameLayer", id, name })}
+            onDuplicateLayer={onDuplicateLayer}
+            onMoveLayer={(id, toIndex) => dispatch({ type: "moveLayer", id, toIndex })}
           />
         </div>
       </div>

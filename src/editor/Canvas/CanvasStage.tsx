@@ -38,6 +38,8 @@ export interface CanvasStageHandle {
   undo: () => void
   redo: () => void
   importImage: (file: Blob, filename: string) => void
+  /** Stash a pending pixel copy; drawn into the new layer's node after the next sync. */
+  stashDuplicate: (fromId: string, toId: string) => void
 }
 
 export const CanvasStage = forwardRef<CanvasStageHandle, CanvasStageProps>(
@@ -46,6 +48,8 @@ export const CanvasStage = forwardRef<CanvasStageHandle, CanvasStageProps>(
     const engineRef = useRef<CanvasEngine | null>(null)
     // A decoded image waiting for its layer's node to exist (drawn in the layers effect).
     const pendingImageRef = useRef<{ source: CanvasImageSource; w: number; h: number } | null>(null)
+    // A layer duplicate waiting for its new node to exist (pixels copied in the layers effect).
+    const pendingDuplicateRef = useRef<{ fromId: string; toId: string } | null>(null)
     // Latest onRequestImageLayer, read through a ref so the handle can stay stable.
     const onRequestImageLayerRef = useRef(props.onRequestImageLayer)
     onRequestImageLayerRef.current = props.onRequestImageLayer
@@ -69,6 +73,9 @@ export const CanvasStage = forwardRef<CanvasStageHandle, CanvasStageProps>(
         redo: () => engineRef.current?.redo(),
         importImage: (file, filename) => {
           void importImage(file, filename)
+        },
+        stashDuplicate: (fromId, toId) => {
+          pendingDuplicateRef.current = { fromId, toId }
         },
       }),
       [importImage],
@@ -105,6 +112,12 @@ export const CanvasStage = forwardRef<CanvasStageHandle, CanvasStageProps>(
       if (pending) {
         engine.drawImageToActiveLayer(pending.source, pending.w, pending.h)
         pendingImageRef.current = null
+      }
+      // The new duplicate layer's node now exists — copy the source's pixels into it.
+      const dup = pendingDuplicateRef.current
+      if (dup) {
+        engine.duplicateLayerPixels(dup.fromId, dup.toId)
+        pendingDuplicateRef.current = null
       }
     }, [props.layers, props.activeLayerId])
 
