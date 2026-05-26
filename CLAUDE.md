@@ -69,8 +69,22 @@ secret-guarded (skip gracefully without `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACC
   on structural nodes like `sidebar-reserved`/`canvas-stage`). Prefer extending those over
   brittle class/DOM-shape assertions.
 
+## Engine decision (resolved)
+
+The perf spike (`../konva-spike`) **passed** — **Konva is the chosen engine**. The brush
+hot path clears 60fps at 2K/50 layers even with a naive single-composite redraw (Firefox
+~9ms). Build notes for when the engine starts:
+- Use the **naive single-composite path**; `layer.cache()` is **not** needed up front and
+  was counterproductive in the spike (huge init/toggle cost). Reserve it for a measured ceiling.
+- Pixi was tested and offers no advantage — stay on Konva (single dependency).
+- The **memory ceiling is unvalidated** (the spike's heap metric missed canvas backing
+  stores, ~800MB for 50×2K). Keep the 50-layer cap; tiling/dirty-tracking is later.
+
+**The engine build itself is still deferred** (design-doc §12: revisit ~July). Don't start
+it without an explicit ask.
+
 ## Deferred (do not build without an explicit ask)
 
-The canvas engine (Konva — gated behind a 1-day perf spike: 50 layers @ 2K, ≥60fps brush),
-Zustand stores, real persistence/file format, the Move/transform tool, eyedropper, and the
-Text tool are all **v0.5+ / engine-phase**. Adding any of them to the shell is scope creep.
+The canvas engine (Konva, decision above), Zustand stores, real persistence/file format,
+the Move/transform tool, eyedropper, and the Text tool are all **v0.5+ / engine-phase**.
+Adding any of them to the shell is scope creep.
