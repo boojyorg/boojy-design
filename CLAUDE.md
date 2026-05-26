@@ -108,9 +108,10 @@ without a canvas mock. Keep scope MVP-disciplined (see Roadmap).
 Rough order, MVP first — **shipped:** canvas engine (Konva, brush hot path) + raster
 brush/eraser + editable foreground colour + PNG export (menu / ⌘E) + undo/redo (strokes only;
 engine-owned snapshot stack, layer ops not yet on the timeline) + image import (Open… /
-drag-drop / ⌘O, fit-centered new layer, not undoable). **Next:** layer ops (reorder / rename /
-duplicate); the document/layer model + Zustand stores graduate alongside these (and undo
-widens to a unified timeline then).
+drag-drop / ⌘O, fit-centered new layer, not undoable) + layer ops (drag-reorder via dnd-kit,
+inline rename, duplicate-with-pixels; reorder is reducer-only since syncLayers restacks from
+the array; not undoable). **Next:** the document/layer model + Zustand stores (undo widens to
+a unified timeline then), then persistence. v0.5+ tools below.
 Then v0.5+: Move/transform tool, Text tool, eyedropper, blend modes, persistence/`.design`
 file format. These aren't forbidden — they're sequenced. Don't pile features onto the shell
 all at once; the **8-feature MVP cap** is the discipline lever. As a side-project this sits

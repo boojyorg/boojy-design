@@ -39,9 +39,9 @@ primitives · Lucide · Vitest + Testing Library · Storybook · Biome · pnpm.
 
 Shipped: the Konva canvas engine — a raster **brush + eraser** (1280×800 page, per-layer
 buffers, zoom-as-stage-scale), an editable **foreground colour** picker, **undo/redo** of
-strokes (Cmd+Z / Cmd+Shift+Z), **image import** (Open… / drag-drop / ⌘O), and **PNG export**
-(Design menu or ⌘E). Next on the MVP paint loop: layer ops (reorder / rename / duplicate).
-After MVP (v0.5+):
+strokes (Cmd+Z / Cmd+Shift+Z), **image import** (Open… / drag-drop / ⌘O), **PNG export**
+(Design menu or ⌘E), and **layer ops** — drag-to-reorder, inline rename, duplicate. That
+rounds out the MVP paint loop. After MVP (v0.5+):
 Move tool + raster transforms, Text, eyedropper, blend modes. Non-MVP tools already appear in
 the rail, dimmed with a "coming in v0.5" tooltip. Sequenced, not piled on at once — the
 8-feature MVP cap is the discipline lever.
