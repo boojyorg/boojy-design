@@ -6,9 +6,17 @@ import {
   stampSpacing,
   strokeAlpha,
 } from "@/editor/Canvas/engine/brush"
-import { type BrushParams, DOC_HEIGHT, DOC_WIDTH, type Point } from "@/editor/Canvas/engine/types"
+import {
+  type BrushParams,
+  DOC_HEIGHT,
+  DOC_WIDTH,
+  PAGE_BACKGROUND,
+  type Point,
+} from "@/editor/Canvas/engine/types"
 import { computeView } from "@/editor/Canvas/engine/viewport"
 import type { Layer } from "@/editor/types"
+import { downloadBlob } from "@/lib/download"
+import { toExportFilename } from "@/lib/filename"
 
 /** One raster layer = a document-space pixel buffer shown through a Konva.Image. */
 interface RasterNode {
@@ -45,6 +53,8 @@ export class CanvasEngine {
   private brush: BrushParams = DEFAULT_BRUSH
   private activeLayerId = ""
   private zoom = 100
+  // Last layer list handed to syncLayers — authoritative order/visibility/opacity for export.
+  private layers: Layer[] = []
 
   // In-progress stroke. `strokeCanvas` accumulates stamps at full alpha; `snapshot`
   // holds the target layer as it was at stroke start. Each frame redraws
@@ -82,7 +92,7 @@ export class CanvasEngine {
       y: 0,
       width: DOC_WIDTH,
       height: DOC_HEIGHT,
-      fill: "#ffffff",
+      fill: PAGE_BACKGROUND,
     })
     this.layer.add(this.page)
 
@@ -122,6 +132,7 @@ export class CanvasEngine {
    *  visibility and opacity. Layers[0] is top of the stack. */
   syncLayers(layers: Layer[], activeLayerId: string) {
     this.activeLayerId = activeLayerId
+    this.layers = layers
     if (!this.layer) return
 
     const seen = new Set<string>()
@@ -195,6 +206,45 @@ export class CanvasEngine {
     this.target = null
     this.lastPoint = null
     this.carryOver = 0
+  }
+
+  /**
+   * Flatten the layer buffers into a PNG and download it. Composites the source
+   * canvases directly (NOT a stage screenshot) so the export is true document-space
+   * 1280×800 regardless of zoom/pan, honouring each layer's visibility, opacity and
+   * stack order. `background: "white"` fills the page first; "transparent" leaves alpha.
+   */
+  exportPNG(opts?: { background?: "white" | "transparent" }) {
+    const background = opts?.background ?? "white"
+    const out = document.createElement("canvas")
+    out.width = DOC_WIDTH
+    out.height = DOC_HEIGHT
+    let ctx: CanvasRenderingContext2D | null = null
+    try {
+      ctx = out.getContext("2d")
+    } catch {
+      ctx = null
+    }
+    if (!ctx) return
+
+    if (background === "white") {
+      ctx.fillStyle = PAGE_BACKGROUND
+      ctx.fillRect(0, 0, DOC_WIDTH, DOC_HEIGHT)
+    }
+
+    // layers[0] is top of the stack, so paint the reversed list bottom→top.
+    for (const layer of [...this.layers].reverse()) {
+      if (!layer.visible) continue
+      const node = this.nodes.get(layer.id)
+      if (!node) continue
+      ctx.globalAlpha = layer.opacity / 100
+      ctx.drawImage(node.canvas, 0, 0)
+    }
+    ctx.globalAlpha = 1
+
+    out.toBlob((blob) => {
+      if (blob) downloadBlob(blob, toExportFilename("Untitled"))
+    }, "image/png")
   }
 
   // ── internals ──────────────────────────────────────────────────────────────

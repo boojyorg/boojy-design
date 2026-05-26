@@ -1,5 +1,6 @@
 import { Circle, Square } from "lucide-react"
-import { type ReactNode, useState } from "react"
+import { type ComponentProps, forwardRef, type ReactNode, useState } from "react"
+import { ColorPopover } from "@/components/ColorPopover"
 import { NumChip } from "@/components/NumChip"
 import { Slider } from "@/components/ui/slider"
 import type { ToolId } from "@/editor/types"
@@ -14,6 +15,7 @@ interface ToolPropertiesProps {
   onBrushSize: (v: number) => void
   onHardness: (v: number) => void
   onOpacity: (v: number) => void
+  onForeground: (color: string) => void
 }
 
 function ToolProp({ label, children }: { label: string; children: ReactNode }) {
@@ -53,16 +55,20 @@ function PropSlider({
   )
 }
 
-function ColorChip({ color }: { color: string }) {
-  return (
-    <button
-      type="button"
-      aria-label="Foreground color"
-      className="h-[22px] w-[26px] rounded-[5px] border border-divider"
-      style={{ backgroundColor: color }}
-    />
-  )
-}
+const ColorChip = forwardRef<HTMLButtonElement, { color: string } & ComponentProps<"button">>(
+  function ColorChip({ color, ...props }, ref) {
+    return (
+      <button
+        ref={ref}
+        type="button"
+        aria-label="Foreground color"
+        className="h-[22px] w-[26px] rounded-[5px] border border-divider"
+        style={{ backgroundColor: color }}
+        {...props}
+      />
+    )
+  },
+)
 
 /**
  * The "Smart Tools" zone — top-bar centre that swaps with the active tool.
@@ -77,6 +83,7 @@ export function ToolProperties({
   onBrushSize,
   onHardness,
   onOpacity,
+  onForeground,
 }: ToolPropertiesProps) {
   const [shapeKind, setShapeKind] = useState<"rect" | "ellipse">("rect")
 
@@ -104,7 +111,9 @@ export function ToolProperties({
         </ToolProp>
         {tool === "brush" && (
           <ToolProp label="Color">
-            <ColorChip color={foreground} />
+            <ColorPopover value={foreground} onChange={onForeground}>
+              <ColorChip color={foreground} />
+            </ColorPopover>
           </ToolProp>
         )}
       </div>
@@ -147,7 +156,9 @@ export function ToolProperties({
           </div>
         </ToolProp>
         <ToolProp label="Fill">
-          <ColorChip color={foreground} />
+          <ColorPopover value={foreground} onChange={onForeground}>
+            <ColorChip color={foreground} />
+          </ColorPopover>
         </ToolProp>
       </div>
     )

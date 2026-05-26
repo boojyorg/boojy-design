@@ -11,12 +11,24 @@ const TOOL_KEYS: Record<string, ToolId> = Object.fromEntries(
 
 /**
  * Global editor shortcuts (disposable, like the rest of the shell state):
- * B/E/R/H select tools, [ ] nudge brush size, +/- zoom. Ignored while typing
- * or when a modifier is held (so OS/browser shortcuts pass through).
+ * ⌘E/Ctrl+E exports, B/E/R/H select tools, [ ] nudge brush size, +/- zoom. Other
+ * modifier combos and typing are ignored (so OS/browser shortcuts pass through).
  */
-export function useKeyboardShortcuts(dispatch: Dispatch<EditorAction>) {
+export function useKeyboardShortcuts(
+  dispatch: Dispatch<EditorAction>,
+  opts?: { onExport?: () => void },
+) {
+  const onExport = opts?.onExport
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
+      // ⌘E / Ctrl+E → export. Handled before the modifier guard, and we preventDefault
+      // to beat the browser's native ⌘E binding.
+      if ((e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === "e") {
+        e.preventDefault()
+        onExport?.()
+        return
+      }
+
       if (e.metaKey || e.ctrlKey || e.altKey) return
 
       const target = e.target as HTMLElement | null
@@ -56,5 +68,5 @@ export function useKeyboardShortcuts(dispatch: Dispatch<EditorAction>) {
 
     window.addEventListener("keydown", onKeyDown)
     return () => window.removeEventListener("keydown", onKeyDown)
-  }, [dispatch])
+  }, [dispatch, onExport])
 }

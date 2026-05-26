@@ -8,9 +8,10 @@ interface LeftRailProps {
   activeTool: ToolId
   foreground: string
   onSelectTool: (tool: ToolId) => void
+  onForeground: (color: string) => void
 }
 
-export function LeftRail({ activeTool, foreground, onSelectTool }: LeftRailProps) {
+export function LeftRail({ activeTool, foreground, onSelectTool, onForeground }: LeftRailProps) {
   return (
     <nav
       aria-label="Tools"
@@ -50,7 +51,7 @@ export function LeftRail({ activeTool, foreground, onSelectTool }: LeftRailProps
 
       <div className="flex-1" />
       <div className="my-1.5 h-px w-7 bg-divider" />
-      <ColorSwatches foreground={foreground} />
+      <ColorSwatches foreground={foreground} onForeground={onForeground} />
     </nav>
   )
 }

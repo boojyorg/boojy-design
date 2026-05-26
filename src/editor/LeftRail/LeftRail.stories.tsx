@@ -5,7 +5,12 @@ import { LeftRail } from "./LeftRail"
 const meta = {
   title: "Editor/LeftRail",
   component: LeftRail,
-  args: { activeTool: "brush", foreground: "#E89940", onSelectTool: () => {} },
+  args: {
+    activeTool: "brush",
+    foreground: "#E89940",
+    onSelectTool: () => {},
+    onForeground: () => {},
+  },
   decorators: [
     (Story) => (
       <TooltipProvider>

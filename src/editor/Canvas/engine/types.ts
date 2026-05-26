@@ -33,3 +33,6 @@ export interface BrushParams {
 /** Fixed document size for this slice (the first real "page"). */
 export const DOC_WIDTH = 1280
 export const DOC_HEIGHT = 800
+
+/** The page (and white-export) background colour — single source for the Konva page + export. */
+export const PAGE_BACKGROUND = "#ffffff"

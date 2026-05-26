@@ -26,6 +26,7 @@ export type EditorAction =
   | { type: "nudgeBrushSize"; delta: number }
   | { type: "setHardness"; value: number }
   | { type: "setOpacity"; value: number }
+  | { type: "setForeground"; color: string }
   | { type: "nudgeZoom"; delta: number }
   | { type: "selectLayer"; id: string }
   | { type: "toggleLayer"; id: string }
@@ -61,6 +62,8 @@ function reducer(state: EditorState, action: EditorAction): EditorState {
       return { ...state, hardness: action.value }
     case "setOpacity":
       return { ...state, opacity: action.value }
+    case "setForeground":
+      return { ...state, foreground: action.color }
     case "nudgeZoom":
       return { ...state, zoom: clampZoom(state.zoom + action.delta) }
     case "selectLayer":

@@ -1,5 +1,6 @@
+import { useCallback, useRef } from "react"
 import { TooltipProvider } from "@/components/ui/tooltip"
-import { CanvasStage } from "@/editor/Canvas/CanvasStage"
+import { CanvasStage, type CanvasStageHandle } from "@/editor/Canvas/CanvasStage"
 import { LeftRail } from "@/editor/LeftRail/LeftRail"
 import { RightSidebar } from "@/editor/RightSidebar/RightSidebar"
 import { useEditorState } from "@/editor/state/useEditorState"
@@ -9,7 +10,9 @@ import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts"
 /** V1 "Classic" — the chosen direction. Three-region layout, mock-interactive. */
 export function EditorV1() {
   const [state, dispatch] = useEditorState()
-  useKeyboardShortcuts(dispatch)
+  const stageRef = useRef<CanvasStageHandle>(null)
+  const onExport = useCallback(() => stageRef.current?.exportPNG(), [])
+  useKeyboardShortcuts(dispatch, { onExport })
 
   return (
     <TooltipProvider delayDuration={200}>
@@ -25,9 +28,11 @@ export function EditorV1() {
           onBrushSize={(value) => dispatch({ type: "setBrushSize", value })}
           onHardness={(value) => dispatch({ type: "setHardness", value })}
           onOpacity={(value) => dispatch({ type: "setOpacity", value })}
+          onForeground={(color) => dispatch({ type: "setForeground", color })}
           onZoomIn={() => dispatch({ type: "nudgeZoom", delta: 25 })}
           onZoomOut={() => dispatch({ type: "nudgeZoom", delta: -25 })}
           onToggleRight={() => dispatch({ type: "toggleRight" })}
+          onExport={onExport}
         />
 
         <div className="flex min-h-0 flex-1">
@@ -35,8 +40,10 @@ export function EditorV1() {
             activeTool={state.activeTool}
             foreground={state.foreground}
             onSelectTool={(tool) => dispatch({ type: "setTool", tool })}
+            onForeground={(color) => dispatch({ type: "setForeground", color })}
           />
           <CanvasStage
+            ref={stageRef}
             tool={state.activeTool}
             brushSize={state.brushSize}
             hardness={state.hardness}

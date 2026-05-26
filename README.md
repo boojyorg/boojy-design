@@ -1,14 +1,14 @@
 # Boojy Design — V1 shell
 
 A pixel-faithful build of the **V1 "Classic"** Boojy Design editor UI (spec v0.1.2):
-top bar, left tool rail, placeholder canvas, and collapsible right sidebar.
+top bar, left tool rail, canvas, and collapsible right sidebar.
 
 > **Status: active side-project.** The V1 UI shell shipped and is live, and the design
-> direction is confirmed — so this is now the foundation for an incrementally-built app,
-> not a throwaway. There's no canvas engine *yet*: the canvas is a static placeholder
-> behind a clean seam (`src/editor/Canvas/CanvasStage.tsx`), and Konva (confirmed by a
-> perf spike) is the next thing in. State is a local reducer for now and graduates to
-> Zustand as the engine lands.
+> direction is confirmed. The Konva canvas engine has now landed: a raster **brush and
+> eraser** paint real pixels on a 1280×800 page in **any colour**, and you can **export to
+> PNG** — all behind a clean seam (`src/editor/Canvas/CanvasStage.tsx` →
+> `src/editor/Canvas/engine/`). State is a local reducer for now and graduates to Zustand as
+> the document model and undo land.
 
 ## Stack
 
@@ -29,15 +29,17 @@ primitives · Lucide · Vitest + Testing Library · Storybook · Biome · pnpm.
 
 ## Layout
 
-- `src/editor/` — the V1 shell, by region (`TopBar/`, `LeftRail/`, `Canvas/`, `RightSidebar/`).
-- `src/editor/state/useEditorState.ts` — local reducer (graduates to Zustand with the engine).
+- `src/editor/` — the editor, by region (`TopBar/`, `LeftRail/`, `Canvas/`, `RightSidebar/`).
+- `src/editor/Canvas/engine/` — the imperative Konva engine behind the canvas seam (brush/eraser, per-layer pixel buffers, viewport math).
+- `src/editor/state/useEditorState.ts` — local reducer (graduates to Zustand with the document model).
 - `src/components/` — reusable primitives (+ `ui/` shadcn-style Radix wrappers).
 - `src/theme/base.tokens.css` — shared Boojy tokens; `accent.design.css` — the per-product amber (the single swap point for other Boojy products).
 
 ## Roadmap
 
-Next: the canvas engine (Konva — spike-confirmed), then the MVP paint loop (raster
-brush/eraser, image import, layers, PNG export). After MVP (v0.5+): Move tool + raster
-transforms, Text, eyedropper, blend modes. Non-MVP tools already appear in the rail,
-dimmed with a "coming in v0.5" tooltip. Sequenced, not piled on at once — the 8-feature
-MVP cap is the discipline lever.
+Shipped: the Konva canvas engine — a raster **brush + eraser** (1280×800 page, per-layer
+buffers, zoom-as-stage-scale), an editable **foreground colour** picker, and **PNG export**
+(Design menu or ⌘E). Next on the MVP paint loop: image import → layer ops. After MVP (v0.5+):
+Move tool + raster transforms, Text, eyedropper, blend modes. Non-MVP tools already appear in
+the rail, dimmed with a "coming in v0.5" tooltip. Sequenced, not piled on at once — the
+8-feature MVP cap is the discipline lever.

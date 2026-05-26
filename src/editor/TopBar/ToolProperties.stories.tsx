@@ -14,6 +14,7 @@ const meta = {
     onBrushSize: noop,
     onHardness: noop,
     onOpacity: noop,
+    onForeground: noop,
   },
   decorators: [(Story) => <div className="flex h-13 items-center bg-chrome px-4">{Story()}</div>],
 } satisfies Meta<typeof ToolProperties>

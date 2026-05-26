@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react"
+import { forwardRef, useEffect, useImperativeHandle, useRef } from "react"
 import { CanvasEngine } from "@/editor/Canvas/engine/CanvasEngine"
 import type { Layer, ToolId } from "@/editor/types"
 
@@ -27,65 +27,75 @@ interface CanvasStageProps {
   activeLayerId: string
 }
 
-export function CanvasStage(props: CanvasStageProps) {
-  const hostRef = useRef<HTMLDivElement>(null)
-  const engineRef = useRef<CanvasEngine | null>(null)
-
-  useEffect(() => {
-    const host = hostRef.current
-    if (!host) return
-    const engine = new CanvasEngine()
-    engine.mount(host)
-    engineRef.current = engine
-    return () => {
-      engine.unmount()
-      engineRef.current = null
-    }
-  }, [])
-
-  useEffect(() => {
-    engineRef.current?.setBrush({
-      tool: props.tool,
-      color: props.foreground,
-      size: props.brushSize,
-      opacity: props.opacity,
-      hardness: props.hardness,
-    })
-  }, [props.tool, props.foreground, props.brushSize, props.opacity, props.hardness])
-
-  useEffect(() => {
-    engineRef.current?.syncLayers(props.layers, props.activeLayerId)
-  }, [props.layers, props.activeLayerId])
-
-  useEffect(() => {
-    engineRef.current?.setZoom(props.zoom)
-  }, [props.zoom])
-
-  const isPaintTool = props.tool === "brush" || props.tool === "eraser"
-
-  return (
-    <div
-      data-testid="canvas-stage"
-      className="relative flex flex-1 items-center justify-center overflow-hidden bg-editor"
-    >
-      <div className="canvas-grid pointer-events-none absolute inset-0" aria-hidden="true" />
-      <div
-        ref={hostRef}
-        className="absolute inset-0"
-        style={{ cursor: isPaintTool ? "crosshair" : "default", touchAction: "none" }}
-        onPointerDown={(e) => {
-          e.currentTarget.setPointerCapture(e.pointerId)
-          engineRef.current?.beginStroke(e.clientX, e.clientY)
-        }}
-        onPointerMove={(e) => engineRef.current?.continueStroke(e.clientX, e.clientY)}
-        onPointerUp={(e) => {
-          engineRef.current?.endStroke()
-          if (e.currentTarget.hasPointerCapture(e.pointerId)) {
-            e.currentTarget.releasePointerCapture(e.pointerId)
-          }
-        }}
-        onPointerCancel={() => engineRef.current?.endStroke()}
-      />
-    </div>
-  )
+/** The narrow imperative surface the engine exposes across the seam. */
+export interface CanvasStageHandle {
+  exportPNG: () => void
 }
+
+export const CanvasStage = forwardRef<CanvasStageHandle, CanvasStageProps>(
+  function CanvasStage(props, ref) {
+    const hostRef = useRef<HTMLDivElement>(null)
+    const engineRef = useRef<CanvasEngine | null>(null)
+
+    // Expose only exportPNG — the engine itself stays sealed inside this component.
+    useImperativeHandle(ref, () => ({ exportPNG: () => engineRef.current?.exportPNG() }), [])
+
+    useEffect(() => {
+      const host = hostRef.current
+      if (!host) return
+      const engine = new CanvasEngine()
+      engine.mount(host)
+      engineRef.current = engine
+      return () => {
+        engine.unmount()
+        engineRef.current = null
+      }
+    }, [])
+
+    useEffect(() => {
+      engineRef.current?.setBrush({
+        tool: props.tool,
+        color: props.foreground,
+        size: props.brushSize,
+        opacity: props.opacity,
+        hardness: props.hardness,
+      })
+    }, [props.tool, props.foreground, props.brushSize, props.opacity, props.hardness])
+
+    useEffect(() => {
+      engineRef.current?.syncLayers(props.layers, props.activeLayerId)
+    }, [props.layers, props.activeLayerId])
+
+    useEffect(() => {
+      engineRef.current?.setZoom(props.zoom)
+    }, [props.zoom])
+
+    const isPaintTool = props.tool === "brush" || props.tool === "eraser"
+
+    return (
+      <div
+        data-testid="canvas-stage"
+        className="relative flex flex-1 items-center justify-center overflow-hidden bg-editor"
+      >
+        <div className="canvas-grid pointer-events-none absolute inset-0" aria-hidden="true" />
+        <div
+          ref={hostRef}
+          className="absolute inset-0"
+          style={{ cursor: isPaintTool ? "crosshair" : "default", touchAction: "none" }}
+          onPointerDown={(e) => {
+            e.currentTarget.setPointerCapture(e.pointerId)
+            engineRef.current?.beginStroke(e.clientX, e.clientY)
+          }}
+          onPointerMove={(e) => engineRef.current?.continueStroke(e.clientX, e.clientY)}
+          onPointerUp={(e) => {
+            engineRef.current?.endStroke()
+            if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+              e.currentTarget.releasePointerCapture(e.pointerId)
+            }
+          }}
+          onPointerCancel={() => engineRef.current?.endStroke()}
+        />
+      </div>
+    )
+  },
+)

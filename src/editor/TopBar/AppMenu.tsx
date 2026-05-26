@@ -13,7 +13,7 @@ function Shortcut({ children }: { children: string }) {
 }
 
 /** "Design ▾" app menu. Export lives here (+ ⌘E) — never in the chrome. */
-export function AppMenu() {
+export function AppMenu({ onExport }: { onExport: () => void }) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger className="flex items-center gap-2 rounded-[7px] px-[11px] py-[7px] outline-none transition-colors hover:bg-hover data-[state=open]:bg-hover">
@@ -29,7 +29,7 @@ export function AppMenu() {
           <span>Open…</span>
           <Shortcut>⌘O</Shortcut>
         </DropdownMenuItem>
-        <DropdownMenuItem>
+        <DropdownMenuItem onSelect={onExport}>
           <span>Export…</span>
           <Shortcut>⌘E</Shortcut>
         </DropdownMenuItem>
