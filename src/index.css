@@ -1,0 +1,49 @@
+@import "tailwindcss";
+@import "./theme/base.tokens.css";
+@import "./theme/accent.design.css";
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    margin: 0;
+    background-color: var(--color-editor);
+    color: var(--color-fg);
+    font-family: var(--font-sans);
+    font-size: 13px;
+    color-scheme: dark;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+/* Canvas backdrop dot-grid (default; matches the prototype's "dots" tweak) */
+.canvas-grid {
+  background-image: radial-gradient(var(--color-elevated) 1px, transparent 1px);
+  background-size: 24px 24px;
+  opacity: 0.6;
+}
+
+/* Floating canvas surface drop shadow */
+.canvas-surface {
+  box-shadow:
+    0 30px 60px rgb(0 0 0 / 0.5),
+    0 0 0 1px rgb(255 255 255 / 0.04);
+}
+
+/* Thin panel scrollbar (Layers list, etc.) */
+.scrollbar-thin::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: var(--color-divider);
+  border-radius: 4px;
+}
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
