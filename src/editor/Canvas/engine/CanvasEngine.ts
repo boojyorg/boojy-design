@@ -6,6 +6,7 @@ import {
   stampSpacing,
   strokeAlpha,
 } from "@/editor/Canvas/engine/brush"
+import { flattenLayers } from "@/editor/Canvas/engine/flatten"
 import { HistoryStack } from "@/editor/Canvas/engine/history"
 import {
   type BrushParams,
@@ -281,20 +282,12 @@ export class CanvasEngine {
     }
     if (!ctx) return
 
-    if (background === "white") {
-      ctx.fillStyle = PAGE_BACKGROUND
-      ctx.fillRect(0, 0, DOC_WIDTH, DOC_HEIGHT)
-    }
-
-    // layers[0] is top of the stack, so paint the reversed list bottom→top.
-    for (const layer of [...this.layers].reverse()) {
-      if (!layer.visible) continue
-      const node = this.nodes.get(layer.id)
-      if (!node) continue
-      ctx.globalAlpha = layer.opacity / 100
-      ctx.drawImage(node.canvas, 0, 0)
-    }
-    ctx.globalAlpha = 1
+    flattenLayers(ctx, this.layers, (id) => this.nodes.get(id)?.canvas, {
+      background,
+      backgroundColor: PAGE_BACKGROUND,
+      width: DOC_WIDTH,
+      height: DOC_HEIGHT,
+    })
 
     out.toBlob((blob) => {
       if (blob) downloadBlob(blob, toExportFilename("Untitled"))
