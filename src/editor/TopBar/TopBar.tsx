@@ -30,7 +30,7 @@ function Divider({ height }: { height: number }) {
 
 export function TopBar(props: TopBarProps) {
   return (
-    <header className="flex h-13 shrink-0 items-center gap-4 border-divider border-b bg-chrome pl-4">
+    <header className="flex h-13 shrink-0 items-center gap-3 border-divider border-b bg-chrome pl-4">
       <AppMenu />
       <Divider height={28} />
       <FilenameField name="Untitled" dirty />
@@ -48,18 +48,24 @@ export function TopBar(props: TopBarProps) {
 
       <Divider height={26} />
 
-      <ToolProperties
-        tool={props.tool}
-        brushSize={props.brushSize}
-        hardness={props.hardness}
-        opacity={props.opacity}
-        foreground={props.foreground}
-        onBrushSize={props.onBrushSize}
-        onHardness={props.onHardness}
-        onOpacity={props.onOpacity}
-      />
-
-      <div className="flex-1" />
+      {/*
+        Tool-props zone takes the spare space; below ~1300px the props scroll
+        horizontally (scrollbar hidden) rather than pushing the right cluster /
+        toggle off-screen. Core chrome stays intact at any width, and every
+        prop stays reachable (trackpad/shift-wheel) instead of being clipped.
+      */}
+      <div className="no-scrollbar flex min-w-0 flex-1 items-center overflow-x-auto">
+        <ToolProperties
+          tool={props.tool}
+          brushSize={props.brushSize}
+          hardness={props.hardness}
+          opacity={props.opacity}
+          foreground={props.foreground}
+          onBrushSize={props.onBrushSize}
+          onHardness={props.onHardness}
+          onOpacity={props.onOpacity}
+        />
+      </div>
 
       {/*
         Right cluster — 288px wide with a left border, so the divider lines up

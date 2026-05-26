@@ -23,6 +23,7 @@ export interface EditorState {
 export type EditorAction =
   | { type: "setTool"; tool: ToolId }
   | { type: "setBrushSize"; value: number }
+  | { type: "nudgeBrushSize"; delta: number }
   | { type: "setHardness"; value: number }
   | { type: "setOpacity"; value: number }
   | { type: "nudgeZoom"; delta: number }
@@ -46,6 +47,7 @@ const initialState: EditorState = {
 }
 
 const clampZoom = (z: number) => Math.min(400, Math.max(10, z))
+const clampSize = (s: number) => Math.min(500, Math.max(1, s))
 
 function reducer(state: EditorState, action: EditorAction): EditorState {
   switch (action.type) {
@@ -53,6 +55,8 @@ function reducer(state: EditorState, action: EditorAction): EditorState {
       return { ...state, activeTool: action.tool }
     case "setBrushSize":
       return { ...state, brushSize: action.value }
+    case "nudgeBrushSize":
+      return { ...state, brushSize: clampSize(state.brushSize + action.delta) }
     case "setHardness":
       return { ...state, hardness: action.value }
     case "setOpacity":

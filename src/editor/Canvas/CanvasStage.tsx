@@ -9,17 +9,22 @@ import { CanvasArt } from "@/editor/Canvas/CanvasArt"
  *  stage replaces the inner surface here — and nothing in the surrounding
  *  chrome (top bar, rail, sidebar) should need to change.
  *
- *  Keep this component dumb: no editor state, no engine scaffolding.
+ *  Keep this component dumb: no editor state, no engine scaffolding. The zoom
+ *  here is a cosmetic CSS scale on the placeholder — real zoom/pan is
+ *  engine-phase; this just keeps the % readout honest.
  * ─────────────────────────────────────────────────────────────────────────
  */
-export function CanvasStage() {
+export function CanvasStage({ zoom = 100 }: { zoom?: number }) {
   return (
     <div
       data-testid="canvas-stage"
       className="relative flex flex-1 items-center justify-center overflow-hidden bg-editor"
     >
       <div className="canvas-grid pointer-events-none absolute inset-0" aria-hidden="true" />
-      <div className="canvas-surface relative">
+      <div
+        className="canvas-surface relative transition-transform duration-150 ease-out"
+        style={{ transform: `scale(${zoom / 100})` }}
+      >
         <CanvasArt width={820} height={540} />
       </div>
     </div>

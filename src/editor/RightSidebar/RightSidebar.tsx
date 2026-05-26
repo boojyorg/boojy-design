@@ -37,6 +37,8 @@ export function RightSidebar({
         data-testid="sidebar-panel"
         data-collapsed={collapsed}
         aria-hidden={collapsed}
+        // `inert` keeps Tab/focus out of the panel while it's slid off-screen.
+        inert={collapsed || undefined}
         className={cn(
           "absolute inset-0 flex flex-col border-divider border-l bg-chrome transition-[transform,opacity] duration-300 ease-[cubic-bezier(0.2,0.7,0.3,1)]",
           collapsed

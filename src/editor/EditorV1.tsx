@@ -4,10 +4,12 @@ import { LeftRail } from "@/editor/LeftRail/LeftRail"
 import { RightSidebar } from "@/editor/RightSidebar/RightSidebar"
 import { useEditorState } from "@/editor/state/useEditorState"
 import { TopBar } from "@/editor/TopBar/TopBar"
+import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts"
 
 /** V1 "Classic" — the chosen direction. Three-region layout, mock-interactive. */
 export function EditorV1() {
   const [state, dispatch] = useEditorState()
+  useKeyboardShortcuts(dispatch)
 
   return (
     <TooltipProvider delayDuration={200}>
@@ -34,7 +36,7 @@ export function EditorV1() {
             foreground={state.foreground}
             onSelectTool={(tool) => dispatch({ type: "setTool", tool })}
           />
-          <CanvasStage />
+          <CanvasStage zoom={state.zoom} />
           <RightSidebar
             collapsed={state.rightCollapsed}
             layers={state.layers}

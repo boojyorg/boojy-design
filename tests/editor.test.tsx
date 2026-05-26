@@ -124,4 +124,39 @@ describe("EditorV1 shell", () => {
     expect(reserved).toHaveClass("w-72")
     expect(screen.getByTestId("canvas-stage")).toBeInTheDocument()
   })
+
+  it("makes the collapsed sidebar inert (keeps focus out)", () => {
+    renderEditor()
+    const panel = screen.getByTestId("sidebar-panel")
+    expect(panel).not.toHaveAttribute("inert")
+    fireEvent.click(screen.getByRole("button", { name: "Hide panels" }))
+    expect(panel).toHaveAttribute("inert")
+  })
+
+  it("selects a tool with a keyboard shortcut (E → Eraser)", () => {
+    renderEditor()
+    expect(within(screen.getByTestId("tool-props")).getByText("Color")).toBeInTheDocument()
+    fireEvent.keyDown(document.body, { key: "e" })
+    expect(within(screen.getByTestId("tool-props")).queryByText("Color")).not.toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "Eraser (E)" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    )
+  })
+
+  it("ignores shortcuts for non-MVP tools (V/T do nothing)", () => {
+    renderEditor()
+    fireEvent.keyDown(document.body, { key: "v" })
+    // Still Brush — Color prop remains.
+    expect(within(screen.getByTestId("tool-props")).getByText("Color")).toBeInTheDocument()
+  })
+
+  it("zooms and nudges brush size via keyboard", () => {
+    renderEditor()
+    expect(screen.getByText("75%")).toBeInTheDocument()
+    fireEvent.keyDown(document.body, { key: "=" })
+    expect(screen.getByText("100%")).toBeInTheDocument()
+    fireEvent.keyDown(document.body, { key: "]" })
+    expect(screen.getByText("35")).toBeInTheDocument()
+  })
 })

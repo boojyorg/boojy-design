@@ -18,7 +18,7 @@ interface ToolPropertiesProps {
 
 function ToolProp({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="flex items-center gap-[9px]">
+    <div className="flex shrink-0 items-center gap-[9px]">
       <span className="font-medium text-fg-faint text-xs">{label}</span>
       {children}
     </div>
