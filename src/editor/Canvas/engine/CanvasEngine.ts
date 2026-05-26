@@ -6,6 +6,7 @@ import {
   stampSpacing,
   strokeAlpha,
 } from "@/editor/Canvas/engine/brush"
+import { drawImageContain } from "@/editor/Canvas/engine/draw"
 import { flattenLayers } from "@/editor/Canvas/engine/flatten"
 import { HistoryStack } from "@/editor/Canvas/engine/history"
 import {
@@ -292,6 +293,17 @@ export class CanvasEngine {
     out.toBlob((blob) => {
       if (blob) downloadBlob(blob, toExportFilename("Untitled"))
     }, "image/png")
+  }
+
+  /** Draw a decoded image into the active layer, fit-centered. Pixels only — no history
+   *  entry (import is a layer op, not on the strokes-only undo timeline). */
+  drawImageToActiveLayer(source: CanvasImageSource, srcW: number, srcH: number) {
+    const node = this.nodes.get(this.activeLayerId)
+    if (!node) return
+    node.ctx.globalCompositeOperation = "source-over"
+    node.ctx.globalAlpha = 1
+    drawImageContain(node.ctx, source, srcW, srcH, DOC_WIDTH, DOC_HEIGHT)
+    this.layer?.batchDraw()
   }
 
   // ── internals ──────────────────────────────────────────────────────────────

@@ -1,6 +1,6 @@
 import { useReducer } from "react"
 import { INITIAL_ACTIVE_LAYER_ID, INITIAL_LAYERS } from "@/editor/mock-data"
-import type { Layer, ToolId } from "@/editor/types"
+import type { Layer, LayerType, ToolId } from "@/editor/types"
 
 /**
  * DISPOSABLE shell state. One reducer, local-only — no persistence, no engine.
@@ -30,7 +30,7 @@ export type EditorAction =
   | { type: "nudgeZoom"; delta: number }
   | { type: "selectLayer"; id: string }
   | { type: "toggleLayer"; id: string }
-  | { type: "addLayer" }
+  | { type: "addLayer"; name?: string; layerType?: LayerType }
   | { type: "deleteActiveLayer" }
   | { type: "toggleRight" }
 
@@ -76,8 +76,8 @@ function reducer(state: EditorState, action: EditorAction): EditorState {
     case "addLayer": {
       const layer: Layer = {
         id: `l-${Math.random().toString(36).slice(2, 8)}`,
-        name: `Layer ${state.nextLayerNum}`,
-        type: "raster",
+        name: action.name ?? `Layer ${state.nextLayerNum}`,
+        type: action.layerType ?? "raster",
         visible: true,
         opacity: 100,
       }

@@ -23,6 +23,7 @@ function renderTopBar(overrides: Partial<ComponentProps<typeof TopBar>> = {}) {
     onZoomOut: noop,
     onToggleRight: noop,
     onExport: noop,
+    onOpen: noop,
     onUndo: noop,
     onRedo: noop,
     canUndo: false,

@@ -16,9 +16,15 @@ const TOOL_KEYS: Record<string, ToolId> = Object.fromEntries(
  */
 export function useKeyboardShortcuts(
   dispatch: Dispatch<EditorAction>,
-  opts?: { onExport?: () => void; onUndo?: () => void; onRedo?: () => void },
+  opts?: {
+    onExport?: () => void
+    onOpen?: () => void
+    onUndo?: () => void
+    onRedo?: () => void
+  },
 ) {
   const onExport = opts?.onExport
+  const onOpen = opts?.onOpen
   const onUndo = opts?.onUndo
   const onRedo = opts?.onRedo
   useEffect(() => {
@@ -48,6 +54,11 @@ export function useKeyboardShortcuts(
         if (key === "e" && !e.shiftKey) {
           e.preventDefault()
           onExport?.()
+          return
+        }
+        if (key === "o" && !e.shiftKey) {
+          e.preventDefault()
+          onOpen?.()
           return
         }
       }
@@ -80,5 +91,5 @@ export function useKeyboardShortcuts(
 
     window.addEventListener("keydown", onKeyDown)
     return () => window.removeEventListener("keydown", onKeyDown)
-  }, [dispatch, onExport, onUndo, onRedo])
+  }, [dispatch, onExport, onOpen, onUndo, onRedo])
 }

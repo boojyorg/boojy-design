@@ -1,6 +1,8 @@
-import { forwardRef, useEffect, useImperativeHandle, useRef } from "react"
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef } from "react"
 import { CanvasEngine } from "@/editor/Canvas/engine/CanvasEngine"
 import type { Layer, ToolId } from "@/editor/types"
+import { toLayerName } from "@/lib/filename"
+import { decodeImageFile } from "@/lib/loadImage"
 
 /**
  * ─────────────────────────────────────────────────────────────────────────
@@ -26,6 +28,8 @@ interface CanvasStageProps {
   layers: Layer[]
   activeLayerId: string
   onHistoryChange: (s: { canUndo: boolean; canRedo: boolean }) => void
+  /** Ask the chrome to add an image-typed layer (reducer owns layer metadata). */
+  onRequestImageLayer: (name: string) => void
 }
 
 /** The narrow imperative surface the engine exposes across the seam. */
@@ -33,12 +37,28 @@ export interface CanvasStageHandle {
   exportPNG: () => void
   undo: () => void
   redo: () => void
+  importImage: (file: Blob, filename: string) => void
 }
 
 export const CanvasStage = forwardRef<CanvasStageHandle, CanvasStageProps>(
   function CanvasStage(props, ref) {
     const hostRef = useRef<HTMLDivElement>(null)
     const engineRef = useRef<CanvasEngine | null>(null)
+    // A decoded image waiting for its layer's node to exist (drawn in the layers effect).
+    const pendingImageRef = useRef<{ source: CanvasImageSource; w: number; h: number } | null>(null)
+    // Latest onRequestImageLayer, read through a ref so the handle can stay stable.
+    const onRequestImageLayerRef = useRef(props.onRequestImageLayer)
+    onRequestImageLayerRef.current = props.onRequestImageLayer
+
+    const importImage = useCallback(async (file: Blob, filename: string) => {
+      const source = await decodeImageFile(file)
+      const w = source instanceof HTMLImageElement ? source.naturalWidth : source.width
+      const h = source instanceof HTMLImageElement ? source.naturalHeight : source.height
+      // Stash the bitmap, then ask the reducer to add the layer; the layers effect draws it
+      // once syncLayers has created (and activated) the new layer's node.
+      pendingImageRef.current = { source, w, h }
+      onRequestImageLayerRef.current(toLayerName(filename))
+    }, [])
 
     // Expose only these commands — the engine itself stays sealed inside this component.
     useImperativeHandle(
@@ -47,8 +67,11 @@ export const CanvasStage = forwardRef<CanvasStageHandle, CanvasStageProps>(
         exportPNG: () => engineRef.current?.exportPNG(),
         undo: () => engineRef.current?.undo(),
         redo: () => engineRef.current?.redo(),
+        importImage: (file, filename) => {
+          void importImage(file, filename)
+        },
       }),
-      [],
+      [importImage],
     )
 
     useEffect(() => {
@@ -74,7 +97,15 @@ export const CanvasStage = forwardRef<CanvasStageHandle, CanvasStageProps>(
     }, [props.tool, props.foreground, props.brushSize, props.opacity, props.hardness])
 
     useEffect(() => {
-      engineRef.current?.syncLayers(props.layers, props.activeLayerId)
+      const engine = engineRef.current
+      if (!engine) return
+      engine.syncLayers(props.layers, props.activeLayerId)
+      // The new image layer's node now exists and is active — draw the pending bitmap.
+      const pending = pendingImageRef.current
+      if (pending) {
+        engine.drawImageToActiveLayer(pending.source, pending.w, pending.h)
+        pendingImageRef.current = null
+      }
     }, [props.layers, props.activeLayerId])
 
     useEffect(() => {
@@ -93,6 +124,8 @@ export const CanvasStage = forwardRef<CanvasStageHandle, CanvasStageProps>(
         className="relative flex flex-1 items-center justify-center overflow-hidden bg-editor"
       >
         <div className="canvas-grid pointer-events-none absolute inset-0" aria-hidden="true" />
+        {/* biome-ignore lint/a11y/noStaticElementInteractions: the Konva engine mounts into
+            this div; it's a custom pointer-painting + image-drop surface, not a semantic control. */}
         <div
           ref={hostRef}
           className="absolute inset-0"
@@ -109,6 +142,12 @@ export const CanvasStage = forwardRef<CanvasStageHandle, CanvasStageProps>(
             }
           }}
           onPointerCancel={() => engineRef.current?.endStroke()}
+          onDragOver={(e) => e.preventDefault()}
+          onDrop={(e) => {
+            e.preventDefault()
+            const file = e.dataTransfer.files?.[0]
+            if (file?.type.startsWith("image/")) void importImage(file, file.name)
+          }}
         />
       </div>
     )

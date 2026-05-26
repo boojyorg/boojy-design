@@ -6,3 +6,12 @@ export function toExportFilename(name: string): string {
     .trim()
   return `${base || "Untitled"}.png`
 }
+
+/** Derive a layer name from an image filename: strip the extension, trim, fallback "Image". */
+export function toLayerName(filename: string): string {
+  const base = filename
+    .trim()
+    .replace(/\.[^.]+$/, "")
+    .trim()
+  return base || "Image"
+}

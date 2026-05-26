@@ -23,6 +23,7 @@ interface TopBarProps {
   onZoomOut: () => void
   onToggleRight: () => void
   onExport: () => void
+  onOpen: () => void
   onUndo: () => void
   onRedo: () => void
   canUndo: boolean
@@ -37,7 +38,7 @@ function Divider({ height }: { height: number }) {
 export function TopBar(props: TopBarProps) {
   return (
     <header className="flex h-13 shrink-0 items-center gap-3 border-divider border-b bg-chrome pl-4">
-      <AppMenu onExport={props.onExport} />
+      <AppMenu onExport={props.onExport} onOpen={props.onOpen} />
       <Divider height={28} />
       <FilenameField name="Untitled" dirty />
 

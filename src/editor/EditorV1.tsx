@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react"
+import { type ChangeEvent, useCallback, useRef, useState } from "react"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { CanvasStage, type CanvasStageHandle } from "@/editor/Canvas/CanvasStage"
 import { LeftRail } from "@/editor/LeftRail/LeftRail"
@@ -11,15 +11,29 @@ import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts"
 export function EditorV1() {
   const [state, dispatch] = useEditorState()
   const stageRef = useRef<CanvasStageHandle>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const [history, setHistory] = useState({ canUndo: false, canRedo: false })
   const onExport = useCallback(() => stageRef.current?.exportPNG(), [])
   const onUndo = useCallback(() => stageRef.current?.undo(), [])
   const onRedo = useCallback(() => stageRef.current?.redo(), [])
-  useKeyboardShortcuts(dispatch, { onExport, onUndo, onRedo })
+  const onOpen = useCallback(() => fileInputRef.current?.click(), [])
+  const onImportFile = useCallback((e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) stageRef.current?.importImage(file, file.name)
+    e.target.value = "" // let the same file be re-imported
+  }, [])
+  useKeyboardShortcuts(dispatch, { onExport, onUndo, onRedo, onOpen })
 
   return (
     <TooltipProvider delayDuration={200}>
       <div className="flex h-full w-full flex-col overflow-hidden bg-editor font-sans text-[13px] text-fg">
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={onImportFile}
+        />
         <TopBar
           tool={state.activeTool}
           brushSize={state.brushSize}
@@ -36,6 +50,7 @@ export function EditorV1() {
           onZoomOut={() => dispatch({ type: "nudgeZoom", delta: -25 })}
           onToggleRight={() => dispatch({ type: "toggleRight" })}
           onExport={onExport}
+          onOpen={onOpen}
           onUndo={onUndo}
           onRedo={onRedo}
           canUndo={history.canUndo}
@@ -60,6 +75,7 @@ export function EditorV1() {
             layers={state.layers}
             activeLayerId={state.activeLayerId}
             onHistoryChange={setHistory}
+            onRequestImageLayer={(name) => dispatch({ type: "addLayer", name, layerType: "image" })}
           />
           <RightSidebar
             collapsed={state.rightCollapsed}
