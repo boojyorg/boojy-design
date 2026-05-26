@@ -23,6 +23,10 @@ interface TopBarProps {
   onZoomOut: () => void
   onToggleRight: () => void
   onExport: () => void
+  onUndo: () => void
+  onRedo: () => void
+  canUndo: boolean
+  canRedo: boolean
 }
 
 /** Vertical divider matching the chrome separators. */
@@ -38,10 +42,10 @@ export function TopBar(props: TopBarProps) {
       <FilenameField name="Untitled" dirty />
 
       <div className="flex gap-0.5">
-        <IconButton aria-label="Undo">
+        <IconButton aria-label="Undo" onClick={props.onUndo} disabled={!props.canUndo}>
           <Undo2 size={17} />
         </IconButton>
-        <IconButton aria-label="Redo" className="text-fg-faint">
+        <IconButton aria-label="Redo" onClick={props.onRedo} disabled={!props.canRedo}>
           <Redo2 size={17} />
         </IconButton>
       </div>

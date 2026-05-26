@@ -16,21 +16,15 @@ const TOOL_KEYS: Record<string, ToolId> = Object.fromEntries(
  */
 export function useKeyboardShortcuts(
   dispatch: Dispatch<EditorAction>,
-  opts?: { onExport?: () => void },
+  opts?: { onExport?: () => void; onUndo?: () => void; onRedo?: () => void },
 ) {
   const onExport = opts?.onExport
+  const onUndo = opts?.onUndo
+  const onRedo = opts?.onRedo
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
-      // ⌘E / Ctrl+E → export. Handled before the modifier guard, and we preventDefault
-      // to beat the browser's native ⌘E binding.
-      if ((e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === "e") {
-        e.preventDefault()
-        onExport?.()
-        return
-      }
-
-      if (e.metaKey || e.ctrlKey || e.altKey) return
-
+      // Ignore everything while typing, so e.g. ⌘Z in the filename/hex field does
+      // native text undo rather than canvas undo. Checked first, before any shortcut.
       const target = e.target as HTMLElement | null
       if (
         target &&
@@ -41,6 +35,24 @@ export function useKeyboardShortcuts(
       ) {
         return
       }
+
+      // ⌘/Ctrl shortcuts — preventDefault to beat the browser's native bindings.
+      if ((e.metaKey || e.ctrlKey) && !e.altKey) {
+        const key = e.key.toLowerCase()
+        if (key === "z") {
+          e.preventDefault()
+          if (e.shiftKey) onRedo?.()
+          else onUndo?.()
+          return
+        }
+        if (key === "e" && !e.shiftKey) {
+          e.preventDefault()
+          onExport?.()
+          return
+        }
+      }
+
+      if (e.metaKey || e.ctrlKey || e.altKey) return
 
       const toolId = TOOL_KEYS[e.key.toLowerCase()]
       if (toolId) {
@@ -68,5 +80,5 @@ export function useKeyboardShortcuts(
 
     window.addEventListener("keydown", onKeyDown)
     return () => window.removeEventListener("keydown", onKeyDown)
-  }, [dispatch, onExport])
+  }, [dispatch, onExport, onUndo, onRedo])
 }

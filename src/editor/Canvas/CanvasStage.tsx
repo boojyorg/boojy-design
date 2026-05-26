@@ -25,11 +25,14 @@ interface CanvasStageProps {
   zoom: number
   layers: Layer[]
   activeLayerId: string
+  onHistoryChange: (s: { canUndo: boolean; canRedo: boolean }) => void
 }
 
 /** The narrow imperative surface the engine exposes across the seam. */
 export interface CanvasStageHandle {
   exportPNG: () => void
+  undo: () => void
+  redo: () => void
 }
 
 export const CanvasStage = forwardRef<CanvasStageHandle, CanvasStageProps>(
@@ -37,8 +40,16 @@ export const CanvasStage = forwardRef<CanvasStageHandle, CanvasStageProps>(
     const hostRef = useRef<HTMLDivElement>(null)
     const engineRef = useRef<CanvasEngine | null>(null)
 
-    // Expose only exportPNG — the engine itself stays sealed inside this component.
-    useImperativeHandle(ref, () => ({ exportPNG: () => engineRef.current?.exportPNG() }), [])
+    // Expose only these commands — the engine itself stays sealed inside this component.
+    useImperativeHandle(
+      ref,
+      () => ({
+        exportPNG: () => engineRef.current?.exportPNG(),
+        undo: () => engineRef.current?.undo(),
+        redo: () => engineRef.current?.redo(),
+      }),
+      [],
+    )
 
     useEffect(() => {
       const host = hostRef.current
@@ -69,6 +80,10 @@ export const CanvasStage = forwardRef<CanvasStageHandle, CanvasStageProps>(
     useEffect(() => {
       engineRef.current?.setZoom(props.zoom)
     }, [props.zoom])
+
+    useEffect(() => {
+      engineRef.current?.setOnHistoryChange(props.onHistoryChange)
+    }, [props.onHistoryChange])
 
     const isPaintTool = props.tool === "brush" || props.tool === "eraser"
 

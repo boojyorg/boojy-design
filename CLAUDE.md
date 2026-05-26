@@ -97,8 +97,10 @@ without a canvas mock. Keep scope MVP-disciplined (see Roadmap).
 ## Roadmap (sequence intentionally — confirm scope before starting a new item)
 
 Rough order, MVP first — **shipped:** canvas engine (Konva, brush hot path) + raster
-brush/eraser + editable foreground colour + PNG export (menu / ⌘E). **Next:** image import →
-layer ops; the document/layer model + Zustand stores graduate alongside these.
+brush/eraser + editable foreground colour + PNG export (menu / ⌘E) + undo/redo (strokes only;
+engine-owned snapshot stack, layer ops not yet on the timeline). **Next:** image import →
+layer ops; the document/layer model + Zustand stores graduate alongside these (and undo
+widens to a unified timeline then).
 Then v0.5+: Move/transform tool, Text tool, eyedropper, blend modes, persistence/`.design`
 file format. These aren't forbidden — they're sequenced. Don't pile features onto the shell
 all at once; the **8-feature MVP cap** is the discipline lever. As a side-project this sits

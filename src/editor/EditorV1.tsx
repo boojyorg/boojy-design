@@ -1,4 +1,4 @@
-import { useCallback, useRef } from "react"
+import { useCallback, useRef, useState } from "react"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { CanvasStage, type CanvasStageHandle } from "@/editor/Canvas/CanvasStage"
 import { LeftRail } from "@/editor/LeftRail/LeftRail"
@@ -11,8 +11,11 @@ import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts"
 export function EditorV1() {
   const [state, dispatch] = useEditorState()
   const stageRef = useRef<CanvasStageHandle>(null)
+  const [history, setHistory] = useState({ canUndo: false, canRedo: false })
   const onExport = useCallback(() => stageRef.current?.exportPNG(), [])
-  useKeyboardShortcuts(dispatch, { onExport })
+  const onUndo = useCallback(() => stageRef.current?.undo(), [])
+  const onRedo = useCallback(() => stageRef.current?.redo(), [])
+  useKeyboardShortcuts(dispatch, { onExport, onUndo, onRedo })
 
   return (
     <TooltipProvider delayDuration={200}>
@@ -33,6 +36,10 @@ export function EditorV1() {
           onZoomOut={() => dispatch({ type: "nudgeZoom", delta: -25 })}
           onToggleRight={() => dispatch({ type: "toggleRight" })}
           onExport={onExport}
+          onUndo={onUndo}
+          onRedo={onRedo}
+          canUndo={history.canUndo}
+          canRedo={history.canRedo}
         />
 
         <div className="flex min-h-0 flex-1">
@@ -52,6 +59,7 @@ export function EditorV1() {
             zoom={state.zoom}
             layers={state.layers}
             activeLayerId={state.activeLayerId}
+            onHistoryChange={setHistory}
           />
           <RightSidebar
             collapsed={state.rightCollapsed}

@@ -6,6 +6,7 @@ import {
   stampSpacing,
   strokeAlpha,
 } from "@/editor/Canvas/engine/brush"
+import { HistoryStack } from "@/editor/Canvas/engine/history"
 import {
   type BrushParams,
   DOC_HEIGHT,
@@ -23,6 +24,13 @@ interface RasterNode {
   canvas: HTMLCanvasElement
   ctx: CanvasRenderingContext2D
   image: Konva.Image
+}
+
+/** One undoable stroke: the affected layer's full pixels before and after the stroke. */
+interface HistoryEntry {
+  layerId: string
+  before: HTMLCanvasElement
+  after: HTMLCanvasElement
 }
 
 const DEFAULT_BRUSH: BrushParams = {
@@ -55,6 +63,11 @@ export class CanvasEngine {
   private zoom = 100
   // Last layer list handed to syncLayers — authoritative order/visibility/opacity for export.
   private layers: Layer[] = []
+  // Undo/redo: full-layer before/after snapshots per committed stroke (strokes only).
+  // Dirty-rect capture would shrink each entry but adds hot-path bounds-tracking — deferred.
+  private readonly history = new HistoryStack<HistoryEntry>()
+  private onHistoryChange?: (s: { canUndo: boolean; canRedo: boolean }) => void
+  private strokeLayerId = ""
 
   // In-progress stroke. `strokeCanvas` accumulates stamps at full alpha; `snapshot`
   // holds the target layer as it was at stroke start. Each frame redraws
@@ -111,6 +124,7 @@ export class CanvasEngine {
     this.page = null
     this.container = null
     this.nodes.clear()
+    this.history.clear()
     this.strokeCanvas = null
     this.strokeCtx = null
     this.snapshotCanvas = null
@@ -150,12 +164,17 @@ export class CanvasEngine {
       node.image.opacity(layer.opacity / 100)
     }
 
+    let pruned = false
     for (const [id, node] of this.nodes) {
       if (!seen.has(id)) {
         node.image.destroy()
         this.nodes.delete(id)
+        // Strokes-only undo can't resurrect a deleted layer — drop its history.
+        this.history.prune((e) => e.layerId === id)
+        pruned = true
       }
     }
+    if (pruned) this.notifyHistory()
 
     // Restack: bottom-of-stack (end of array) up to top-of-stack (index 0), page beneath.
     for (const layer of [...layers].reverse()) {
@@ -177,6 +196,7 @@ export class CanvasEngine {
     if (!point) return
 
     this.target = target
+    this.strokeLayerId = this.activeLayerId
     this.snapshotCtx.clearRect(0, 0, DOC_WIDTH, DOC_HEIGHT)
     this.snapshotCtx.drawImage(target.canvas, 0, 0)
     this.strokeCtx.clearRect(0, 0, DOC_WIDTH, DOC_HEIGHT)
@@ -201,11 +221,45 @@ export class CanvasEngine {
   }
 
   endStroke() {
-    if (!this.target) return
+    const target = this.target
+    if (!target) return
     this.render() // bake the final state into the layer buffer
+
+    // Record the stroke: before = pre-stroke snapshot, after = the baked result.
+    if (this.snapshotCanvas) {
+      this.history.push({
+        layerId: this.strokeLayerId,
+        before: this.cloneCanvas(this.snapshotCanvas),
+        after: this.cloneCanvas(target.canvas),
+      })
+      this.notifyHistory()
+    }
+
     this.target = null
     this.lastPoint = null
     this.carryOver = 0
+  }
+
+  /** Restore the layer to the previous stroke's "before" pixels. */
+  undo() {
+    const entry = this.history.undo()
+    if (!entry) return
+    this.restore(entry.layerId, entry.before)
+    this.notifyHistory()
+  }
+
+  /** Re-apply the undone stroke's "after" pixels. */
+  redo() {
+    const entry = this.history.redo()
+    if (!entry) return
+    this.restore(entry.layerId, entry.after)
+    this.notifyHistory()
+  }
+
+  /** Subscribe to undo/redo availability; fires immediately with the current state. */
+  setOnHistoryChange(cb: (s: { canUndo: boolean; canRedo: boolean }) => void) {
+    this.onHistoryChange = cb
+    this.notifyHistory()
   }
 
   /**
@@ -248,6 +302,30 @@ export class CanvasEngine {
   }
 
   // ── internals ──────────────────────────────────────────────────────────────
+
+  private notifyHistory() {
+    this.onHistoryChange?.({ canUndo: this.history.canUndo(), canRedo: this.history.canRedo() })
+  }
+
+  /** Overwrite a layer's pixels with a snapshot (undo/redo restore). */
+  private restore(layerId: string, snapshot: HTMLCanvasElement) {
+    const node = this.nodes.get(layerId)
+    if (!node) return
+    node.ctx.globalCompositeOperation = "source-over"
+    node.ctx.globalAlpha = 1
+    node.ctx.clearRect(0, 0, DOC_WIDTH, DOC_HEIGHT)
+    node.ctx.drawImage(snapshot, 0, 0)
+    this.layer?.batchDraw()
+  }
+
+  /** Copy a document-space canvas into a fresh one (for history snapshots). */
+  private cloneCanvas(source: HTMLCanvasElement): HTMLCanvasElement {
+    const copy = document.createElement("canvas")
+    copy.width = DOC_WIDTH
+    copy.height = DOC_HEIGHT
+    copy.getContext("2d")?.drawImage(source, 0, 0)
+    return copy
+  }
 
   private createNode(): RasterNode | null {
     const canvas = document.createElement("canvas")
