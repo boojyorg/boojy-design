@@ -46,10 +46,24 @@ jobs:
         with:
           node-version-file: .nvmrc
           cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm build
+      # Skip the deploy gracefully (green check + notice) until the Cloudflare
+      # secrets are added to this repo, then it starts deploying automatically.
+      - name: Check Cloudflare credentials
+        id: guard
+        run: |
+          if [ -n "${{ secrets.CLOUDFLARE_API_TOKEN }}" ] && [ -n "${{ secrets.CLOUDFLARE_ACCOUNT_ID }}" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Preview deploy skipped — set CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID repo secrets to enable it."
+          fi
+      - if: steps.guard.outputs.ready == 'true'
+        run: pnpm install --frozen-lockfile
+      - if: steps.guard.outputs.ready == 'true'
+        run: pnpm build
       - name: Deploy to Cloudflare Pages
         id: deploy
+        if: steps.guard.outputs.ready == 'true'
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -58,7 +72,7 @@ jobs:
           #   wrangler pages project create boojy-design --production-branch main)
           command: pages deploy dist --project-name=boojy-design --branch=${{ github.head_ref }}
       - name: Comment preview URL on PR
-        if: steps.deploy.outputs.deployment-url != ''
+        if: steps.guard.outputs.ready == 'true' && steps.deploy.outputs.deployment-url != ''
         uses: actions/github-script@v7
         with:
           script: |
