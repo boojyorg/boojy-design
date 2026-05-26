@@ -5,10 +5,10 @@ top bar, left tool rail, canvas, and collapsible right sidebar.
 
 > **Status: active side-project.** The V1 UI shell shipped and is live, and the design
 > direction is confirmed. The Konva canvas engine has now landed: a raster **brush and
-> eraser** paint real pixels on a 1280×800 page in **any colour**, with **undo/redo** and
-> **PNG export** — all behind a clean seam (`src/editor/Canvas/CanvasStage.tsx` →
-> `src/editor/Canvas/engine/`). State is a local reducer for now and graduates to Zustand as
-> the full document model lands.
+> eraser** paint real pixels on a 1280×800 page in **any colour**, with **undo/redo**,
+> **image import** (open or drag-drop) and **PNG export** — all behind a clean seam
+> (`src/editor/Canvas/CanvasStage.tsx` → `src/editor/Canvas/engine/`). State is a local
+> reducer for now and graduates to Zustand as the full document model lands.
 
 ## Stack
 
@@ -39,8 +39,9 @@ primitives · Lucide · Vitest + Testing Library · Storybook · Biome · pnpm.
 
 Shipped: the Konva canvas engine — a raster **brush + eraser** (1280×800 page, per-layer
 buffers, zoom-as-stage-scale), an editable **foreground colour** picker, **undo/redo** of
-strokes (Cmd+Z / Cmd+Shift+Z), and **PNG export** (Design menu or ⌘E). Next on the MVP paint
-loop: image import → layer ops. After MVP (v0.5+):
+strokes (Cmd+Z / Cmd+Shift+Z), **image import** (Open… / drag-drop / ⌘O), and **PNG export**
+(Design menu or ⌘E). Next on the MVP paint loop: layer ops (reorder / rename / duplicate).
+After MVP (v0.5+):
 Move tool + raster transforms, Text, eyedropper, blend modes. Non-MVP tools already appear in
 the rail, dimmed with a "coming in v0.5" tooltip. Sequenced, not piled on at once — the
 8-feature MVP cap is the discipline lever.

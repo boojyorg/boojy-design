@@ -71,6 +71,15 @@ secret-guarded (skip gracefully without `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACC
 - **Tests target accessible queries** (roles, `aria-label`, `aria-selected`, `data-testid`
   on structural nodes like `sidebar-reserved`/`canvas-stage`). Prefer extending those over
   brittle class/DOM-shape assertions.
+- **Two Vitest projects** (`vite.config.ts`): `dom` (jsdom — the shell/wiring tests, where
+  the engine no-ops via the `getContext` stub) and `node` (`tests/pixel/**`, real
+  `@napi-rs/canvas`, no setup stub). `pnpm test` runs both. To pixel-test engine drawing,
+  extract the algorithm into a pure **ctx-taking** function (e.g. `flatten.ts`, `draw.ts`,
+  `fit.ts`) and assert `getImageData` — don't try to instantiate the Konva-coupled engine in
+  node. Cast the `@napi-rs` context to the DOM `CanvasRenderingContext2D` in tests.
+- **Hooks + scripts:** `simple-git-hooks` runs `lint`+`typecheck` on pre-commit, `test` on
+  pre-push (`pnpm prepare` installs them). Standalone `pnpm typecheck` (`tsc -b --noEmit`)
+  and `pnpm test:coverage` (v8, no threshold) exist. Dependabot watches npm + actions weekly.
 - **Keep the docs current.** When a change shifts project status, architecture, or roadmap
   (a new engine capability, a removed stub, a sequencing change), update `README.md` and
   this `CLAUDE.md` in the *same* change — don't let them drift from the code. The most
@@ -98,8 +107,9 @@ without a canvas mock. Keep scope MVP-disciplined (see Roadmap).
 
 Rough order, MVP first — **shipped:** canvas engine (Konva, brush hot path) + raster
 brush/eraser + editable foreground colour + PNG export (menu / ⌘E) + undo/redo (strokes only;
-engine-owned snapshot stack, layer ops not yet on the timeline). **Next:** image import →
-layer ops; the document/layer model + Zustand stores graduate alongside these (and undo
+engine-owned snapshot stack, layer ops not yet on the timeline) + image import (Open… /
+drag-drop / ⌘O, fit-centered new layer, not undoable). **Next:** layer ops (reorder / rename /
+duplicate); the document/layer model + Zustand stores graduate alongside these (and undo
 widens to a unified timeline then).
 Then v0.5+: Move/transform tool, Text tool, eyedropper, blend modes, persistence/`.design`
 file format. These aren't forbidden — they're sequenced. Don't pile features onto the shell
