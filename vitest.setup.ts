@@ -12,3 +12,9 @@ Element.prototype.hasPointerCapture ??= () => false
 Element.prototype.setPointerCapture ??= () => undefined
 Element.prototype.releasePointerCapture ??= () => undefined
 Element.prototype.scrollIntoView ??= () => undefined
+
+// jsdom can't rasterize. The canvas engine capability-guards on a null 2D context
+// and no-ops; stub getContext to return null *silently* so the guard fires without
+// jsdom's noisy "not implemented" warnings. (Not a canvas mock — no rasterization.)
+HTMLCanvasElement.prototype.getContext = (() =>
+  null) as typeof HTMLCanvasElement.prototype.getContext

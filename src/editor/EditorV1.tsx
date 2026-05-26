@@ -36,7 +36,16 @@ export function EditorV1() {
             foreground={state.foreground}
             onSelectTool={(tool) => dispatch({ type: "setTool", tool })}
           />
-          <CanvasStage zoom={state.zoom} />
+          <CanvasStage
+            tool={state.activeTool}
+            brushSize={state.brushSize}
+            hardness={state.hardness}
+            opacity={state.opacity}
+            foreground={state.foreground}
+            zoom={state.zoom}
+            layers={state.layers}
+            activeLayerId={state.activeLayerId}
+          />
           <RightSidebar
             collapsed={state.rightCollapsed}
             layers={state.layers}
