@@ -112,15 +112,26 @@ describe("EditorV1 shell", () => {
     expect(screen.getByRole("button", { name: "Fill (G)" })).toHaveAttribute("aria-pressed", "true")
   })
 
-  it("disables non-MVP tools (Move, Text) with a coming-in-v0.5 affordance", () => {
+  it("selects the Move tool (click or V) and shows the drag-to-move hint", () => {
     renderEditor()
-    const move = screen.getByRole("button", { name: "Move — coming in v0.5" })
+    fireEvent.click(screen.getByRole("button", { name: "Move (V)" }))
+    expect(screen.getByRole("button", { name: "Move (V)" })).toHaveAttribute("aria-pressed", "true")
+    expect(screen.getByTestId("tool-props")).toHaveTextContent("Drag a layer to move it")
+  })
+
+  it("selects the Move tool with the V shortcut", () => {
+    renderEditor()
+    fireEvent.keyDown(document.body, { key: "v" })
+    expect(screen.getByRole("button", { name: "Move (V)" })).toHaveAttribute("aria-pressed", "true")
+  })
+
+  it("disables the non-MVP Text tool with a coming-in-v0.5 affordance", () => {
+    renderEditor()
     const text = screen.getByRole("button", { name: "Text — coming in v0.5" })
-    expect(move).toHaveAttribute("aria-disabled", "true")
     expect(text).toHaveAttribute("aria-disabled", "true")
 
     // Clicking a disabled tool must not change the active tool (Brush props stay).
-    fireEvent.click(move)
+    fireEvent.click(text)
     expect(within(screen.getByTestId("tool-props")).getByText("Color")).toBeInTheDocument()
   })
 
@@ -209,9 +220,9 @@ describe("EditorV1 shell", () => {
     )
   })
 
-  it("ignores shortcuts for non-MVP tools (V/T do nothing)", () => {
+  it("ignores shortcuts for the non-MVP Text tool (T does nothing)", () => {
     renderEditor()
-    fireEvent.keyDown(document.body, { key: "v" })
+    fireEvent.keyDown(document.body, { key: "t" })
     // Still Brush — Color prop remains.
     expect(within(screen.getByTestId("tool-props")).getByText("Color")).toBeInTheDocument()
   })

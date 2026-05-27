@@ -20,6 +20,9 @@ interface SerializedLayer {
   kind?: VectorKind
   /** data: URL PNG of the layer's pixels, or null if it had none (or couldn't be read). */
   pixels: string | null
+  /** Non-destructive display offset; omitted when at origin. Absent in pre-offset files (→ 0). */
+  offsetX?: number
+  offsetY?: number
 }
 
 interface DesignFile {
@@ -31,28 +34,35 @@ interface DesignFile {
   layers: SerializedLayer[]
 }
 
-/** A parsed file split into the document slice and the per-layer pixel data to decode. */
+/** A parsed file split into the document slice, per-layer pixel data, and per-layer offsets. */
 export interface ParsedDesign {
   snapshot: DocumentSnapshot
   pixels: { layerId: string; dataUrl: string }[]
+  offsets: { layerId: string; x: number; y: number }[]
 }
 
 /** Serialise the current document to a `.design` JSON string. `getPixels` reads a layer's
- *  pixels from the engine (null under jsdom / for a layer with no node). */
+ *  pixels from the engine (null under jsdom / for a layer with no node); `getOffset` reads
+ *  its non-destructive display offset (defaults to origin). */
 export function serializeDesign(
   snapshot: DocumentSnapshot,
   getPixels: (layerId: string) => HTMLCanvasElement | null,
   size: { width: number; height: number },
+  getOffset: (layerId: string) => { x: number; y: number } = () => ({ x: 0, y: 0 }),
 ): string {
-  const layers: SerializedLayer[] = snapshot.layers.map((l) => ({
-    id: l.id,
-    name: l.name,
-    type: l.type,
-    visible: l.visible,
-    opacity: l.opacity,
-    ...(l.kind ? { kind: l.kind } : {}),
-    pixels: getPixels(l.id)?.toDataURL("image/png") ?? null,
-  }))
+  const layers: SerializedLayer[] = snapshot.layers.map((l) => {
+    const off = getOffset(l.id)
+    return {
+      id: l.id,
+      name: l.name,
+      type: l.type,
+      visible: l.visible,
+      opacity: l.opacity,
+      ...(l.kind ? { kind: l.kind } : {}),
+      ...(off.x || off.y ? { offsetX: off.x, offsetY: off.y } : {}),
+      pixels: getPixels(l.id)?.toDataURL("image/png") ?? null,
+    }
+  })
   const file: DesignFile = {
     format: FORMAT,
     version: VERSION,
@@ -81,10 +91,17 @@ export function parseDesign(json: string): ParsedDesign {
   const pixels = data.layers
     .filter((l): l is SerializedLayer & { pixels: string } => typeof l.pixels === "string")
     .map((l) => ({ layerId: l.id, dataUrl: l.pixels }))
+  const offsets = data.layers
+    .filter(
+      (l): l is SerializedLayer & { offsetX: number; offsetY: number } =>
+        typeof l.offsetX === "number" && typeof l.offsetY === "number",
+    )
+    .map((l) => ({ layerId: l.id, x: l.offsetX, y: l.offsetY }))
 
   return {
     snapshot: { layers, activeLayerId: data.activeLayerId, nextLayerNum: data.nextLayerNum },
     pixels,
+    offsets,
   }
 }
 

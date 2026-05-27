@@ -14,8 +14,10 @@ landed and the **MVP paint loop is in place** — paint/erase in any colour acro
 (see "Engine decision" and "Roadmap" below). The document model has graduated to a Zustand
 `documentStore`, undo/redo is a **unified timeline** (`undoStore`) — strokes *and* every layer
 op (incl. undo-delete with pixels) on one stack — documents **save/open** as `.design`
-files (`src/lib/designFile.ts`), and the **Shape tool** draws filled rect/ellipse (drag to
-size, Shift = square/circle) onto the active layer. Next are the remaining v0.5 tools.
+files (`src/lib/designFile.ts`), the **Shape tool** draws filled rect/ellipse (drag to
+size, Shift = square/circle) onto the active layer, and the **Move tool** repositions the active
+layer **non-destructively** via a per-layer display offset (pixels never leave the buffer).
+Next are the remaining v0.5 tools.
 
 Two things that still shape any change:
 - **The canvas is a seam.** `src/editor/Canvas/CanvasStage.tsx` mounts the imperative Konva
@@ -57,13 +59,15 @@ secret-guarded (skip gracefully without `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACC
   composition root — it owns the shell reducer, reads the document/undo stores, wraps layer
   ops in undo commands (`commands.ts`), and orchestrates save/open; regions are otherwise
   presentational.
-- **`src/lib/tools.ts`** — the tool registry. Each tool has an `mvp` flag. Non-MVP tools
-  (Move, Text) are shown **dimmed with a "coming in v0.5" tooltip**, and keyboard shortcuts
+- **`src/lib/tools.ts`** — the tool registry. Each tool has an `mvp` flag. The lone non-MVP
+  tool (Text) is shown **dimmed with a "coming in v0.5" tooltip**, and keyboard shortcuts
   (`src/hooks/useKeyboardShortcuts.ts`) act on MVP tools only. Keep the rail and the
   shortcut map telling the same story.
 - **`src/editor/types.ts`** — the layer model is intentionally thin (no `transform`,
   `bitmap`, or blend mode). Those are engine-phase; don't add them to make the shell "more
-  real."
+  real." The **Move tool upholds this**: a layer's translate lives as a per-layer display offset
+  in the **engine** (a `Map<layerId,{x,y}>` in `CanvasEngine`), *not* as a `transform` field on
+  the model — "transforms are engine-phase." Scale/rotate would need the real transform model — deferred.
 - **Design tokens (Tailwind v4, CSS-first):** `src/theme/base.tokens.css` holds the
   **shared** Boojy tokens (surfaces, text, semantics) in an `@theme` block;
   `src/theme/accent.design.css` holds the **per-product accent** (amber). Reskinning to
@@ -144,8 +148,21 @@ foreground, a 0–100 **Tolerance** slider (top bar) controlling match looseness
 undoable via the same commit path as a stroke. To avoid a fringe ring on soft strokes the fill
 **composites the colour *under* the anti-aliased edge** ("fill behind"): it marches out from the
 flood into the feather, blending the fill beneath each `0<alpha<255` pixel and halting at the
-solid core and the transparent exterior. **Next:** the remaining v0.5 tools below.
-Then v0.5+: Move/transform tool, Text tool, blend modes. These aren't forbidden —
+solid core and the transparent exterior. Plus the **Move tool** (`CanvasEngine`'s `select` branch
+of begin/continue/endStroke + `nudgeActiveLayer`; offset math in `move.ts`): a rail tool (`V`)
+that repositions the active layer **non-destructively** — it sets a per-layer **display offset**
+(`getLayerOffset`/`setLayerOffset`, an engine-side `Map`) and just repositions the Konva image,
+so **pixels never move inside their buffer**. Drag a layer off-page and back and the hidden part
+survives; off-page pixels are *clipped to the page* (the content layer is `clip`-bounded) on
+screen and in export, but kept in the buffer. Arrow keys nudge (1px, 10px with Shift). The move is
+**translate-only** and undoable via a cheap **offset command** (before/after `{x,y}`, no pixel
+clone) — `setOnMoveCommitted` → `undoStore`. Because the buffer stays in its own local space,
+paint ops are unchanged: only the *input point* is shifted by `−offset` (brush/shape/fill), and
+**composite reads go through an offset-aware `flattenLayers`** (eyedropper, export). The offset is
+saved in `.design` (additive `offsetX/offsetY`, no version bump), copied on duplicate, and restored
+on undo-delete (the `Map` entry outlives the destroyed node; `syncLayers` re-applies it).
+**Next:** the remaining v0.5 tools below. Then v0.5+: Move *scale/rotate* (needs the transform
+model), Text tool, blend modes. These aren't forbidden —
 they're sequenced. Don't pile features onto the shell
 all at once; the **8-feature MVP cap** is the discipline lever. As a side-project this sits
 behind Igni / Boojy Audio / DELE — keep changes small and shippable.

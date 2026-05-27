@@ -46,6 +46,8 @@ export function EditorV1() {
     () => ({
       captureLayerPixels: (id) => stageRef.current?.captureLayerPixels(id) ?? null,
       stashPixelRestore: (id, canvas) => stageRef.current?.stashPixelRestore(id, canvas),
+      getLayerOffset: (id) => stageRef.current?.getLayerOffset(id) ?? { x: 0, y: 0 },
+      setLayerOffset: (id, offset) => stageRef.current?.setLayerOffset(id, offset),
     }),
     [],
   )
@@ -61,6 +63,7 @@ export function EditorV1() {
       { layers: docLayers, activeLayerId: active, nextLayerNum },
       (id) => stageRef.current?.captureLayerPixels(id) ?? null,
       { width: DOC_WIDTH, height: DOC_HEIGHT },
+      (id) => stageRef.current?.getLayerOffset(id) ?? { x: 0, y: 0 },
     )
     downloadBlob(new Blob([json], { type: "application/json" }), toDesignFilename("Untitled"))
   }, [])
@@ -91,8 +94,13 @@ export function EditorV1() {
             canvas: await decodeDataUrlToCanvas(p.dataUrl),
           })),
         )
+        // Drop the previous document's offsets, then stash pixels + offsets for the new layers;
+        // the layers effect's sync creates the nodes and positions them from the offset map.
+        stageRef.current?.clearOffsets()
         for (const { layerId, canvas } of decoded)
           stageRef.current?.stashPixelRestore(layerId, canvas)
+        for (const o of parsed.offsets)
+          stageRef.current?.setLayerOffset(o.layerId, { x: o.x, y: o.y })
         useDocumentStore.setState(parsed.snapshot)
         clearUndo()
       } catch (err) {

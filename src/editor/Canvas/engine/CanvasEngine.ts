@@ -10,6 +10,7 @@ import { hexToRgb, rgbaToHex } from "@/editor/Canvas/engine/color"
 import { drawImageContain } from "@/editor/Canvas/engine/draw"
 import { floodFill } from "@/editor/Canvas/engine/fill"
 import { flattenLayers } from "@/editor/Canvas/engine/flatten"
+import { moveOffset, type Offset } from "@/editor/Canvas/engine/move"
 import { drawEllipse, drawRect, normalizeRect } from "@/editor/Canvas/engine/shape"
 import {
   type BrushParams,
@@ -36,6 +37,14 @@ export interface StrokeCommit {
   layerId: string
   before: HTMLCanvasElement
   after: HTMLCanvasElement
+}
+
+/** A committed move handed up to the timeline: a layer's display offset before and after.
+ *  Cheap (no pixel clone) — the move is non-destructive, so only the offset changes. */
+export interface MoveCommit {
+  layerId: string
+  before: Offset
+  after: Offset
 }
 
 const DEFAULT_BRUSH: BrushParams = {
@@ -85,8 +94,16 @@ export class CanvasEngine {
   private target: RasterNode | null = null
   private lastPoint: Point | null = null
   private carryOver = 0
-  // Shape tool: the drag origin in doc space. Non-null only mid shape-drag.
+  // Shape tool: the drag origin in buffer-local space. Non-null only mid shape-drag.
   private shapeStart: Point | null = null
+  // Per-layer non-destructive display offset (where each buffer is drawn, in doc pixels). Lives
+  // here in the engine — NOT on the thin Layer model — so a move never touches pixels. Entries
+  // persist past a node's destruction so undo-delete restores position (syncLayers re-applies).
+  private readonly offsets = new Map<string, Offset>()
+  // Active move-drag: the doc-space point where it began and the layer's offset at that moment.
+  private moveStart: Point | null = null
+  private moveStartOffset: Offset = { x: 0, y: 0 }
+  private onMoveCommitted?: (commit: MoveCommit) => void
   // Latest Shift state for the shape constraint — updated by pointer moves *and* by
   // raw Shift key events, so the preview tracks Shift even while the pointer is still.
   private shiftDown = false
@@ -107,7 +124,12 @@ export class CanvasEngine {
     const height = container.clientHeight || 1
 
     this.stage = new Konva.Stage({ container, width, height })
-    this.layer = new Konva.Layer({ listening: false })
+    // Clip the content to the page bounds (doc space) so a layer dragged off the edge hides
+    // at the page border rather than spilling over the work area — its pixels stay in the buffer.
+    this.layer = new Konva.Layer({
+      listening: false,
+      clip: { x: 0, y: 0, width: DOC_WIDTH, height: DOC_HEIGHT },
+    })
     this.stage.add(this.layer)
 
     this.page = new Konva.Rect({
@@ -171,6 +193,9 @@ export class CanvasEngine {
       }
       node.image.visible(layer.visible)
       node.image.opacity(layer.opacity / 100)
+      // Re-apply the layer's display offset (defaults to origin) — keeps a moved layer in place
+      // across reorders and restores its position when undo-delete resurrects the node.
+      node.image.position(this.offsets.get(layer.id) ?? { x: 0, y: 0 })
     }
 
     for (const [id, node] of this.nodes) {
@@ -193,7 +218,12 @@ export class CanvasEngine {
 
   beginStroke(clientX: number, clientY: number) {
     if (!this.stage) return
-    if (this.brush.tool !== "brush" && this.brush.tool !== "eraser" && this.brush.tool !== "shape")
+    if (
+      this.brush.tool !== "brush" &&
+      this.brush.tool !== "eraser" &&
+      this.brush.tool !== "shape" &&
+      this.brush.tool !== "select"
+    )
       return
 
     const target = this.nodes.get(this.activeLayerId)
@@ -205,39 +235,66 @@ export class CanvasEngine {
 
     this.target = target
     this.strokeLayerId = this.activeLayerId
+
+    if (this.brush.tool === "select") {
+      // Move drags the whole layer: track the gesture in doc space against the layer's current
+      // offset. No buffers, no pixel writes — the layer's image just gets repositioned.
+      this.moveStart = point
+      this.moveStartOffset = this.getLayerOffset(this.activeLayerId)
+      return
+    }
+
+    // Paint tools work in the layer's buffer-local space (buffer pixel == doc point − offset),
+    // so a stroke lands under the cursor on a moved layer without changing the rest of the path.
+    const off = this.getLayerOffset(this.activeLayerId)
+    const local = { x: point.x - off.x, y: point.y - off.y }
     this.snapshotCtx.clearRect(0, 0, DOC_WIDTH, DOC_HEIGHT)
     this.snapshotCtx.drawImage(target.canvas, 0, 0)
     this.strokeCtx.clearRect(0, 0, DOC_WIDTH, DOC_HEIGHT)
     this.carryOver = 0
-    this.lastPoint = point
+    this.lastPoint = local
 
     if (this.brush.tool === "shape") {
       // No preview until the first drag move — a zero-size shape draws nothing.
-      this.shapeStart = point
+      this.shapeStart = local
       return
     }
 
-    this.stampAt(point)
+    this.stampAt(local)
     this.render()
   }
 
   continueStroke(clientX: number, clientY: number, shiftKey = false) {
-    if (!this.target || !this.lastPoint) return
+    if (!this.target) return
     const point = this.screenToDoc(clientX, clientY)
     if (!point) return
 
+    if (this.brush.tool === "select") {
+      // Repositions the layer's image to the new offset — pixels untouched.
+      if (!this.moveStart) return
+      this.setLayerOffset(
+        this.strokeLayerId,
+        moveOffset(this.moveStartOffset, this.moveStart, point),
+      )
+      return
+    }
+
+    if (!this.lastPoint) return
+    const off = this.getLayerOffset(this.strokeLayerId)
+    const local = { x: point.x - off.x, y: point.y - off.y }
+
     if (this.brush.tool === "shape") {
       this.shiftDown = shiftKey
-      this.lastPoint = point
+      this.lastPoint = local
       this.drawShapePreview()
       return
     }
 
     const spacing = stampSpacing(this.brush.size)
-    const run = interpolateStamps(this.lastPoint, point, spacing, this.carryOver)
+    const run = interpolateStamps(this.lastPoint, local, spacing, this.carryOver)
     for (const stamp of run.points) this.stampAt(stamp)
     this.carryOver = run.carryOver
-    this.lastPoint = point
+    this.lastPoint = local
     this.render()
   }
 
@@ -263,9 +320,53 @@ export class CanvasEngine {
     this.render()
   }
 
+  /** A layer's non-destructive display offset (origin if it's never been moved). */
+  getLayerOffset(layerId: string): Offset {
+    return this.offsets.get(layerId) ?? { x: 0, y: 0 }
+  }
+
+  /** Set a layer's display offset: store it and reposition its Konva image. Public so the
+   *  timeline (move undo/redo), duplicate and document-open can replay positions. */
+  setLayerOffset(layerId: string, offset: Offset) {
+    this.offsets.set(layerId, offset)
+    this.nodes.get(layerId)?.image.position(offset)
+    this.layer?.batchDraw()
+  }
+
+  /** Drop all stored offsets (on opening a new document). */
+  clearOffsets() {
+    this.offsets.clear()
+  }
+
+  /** Nudge the active layer by (dx, dy) and commit it as one undoable step (the arrow-key
+   *  path). Non-destructive — adjusts the offset; no-op on a hidden/missing layer. */
+  nudgeActiveLayer(dx: number, dy: number) {
+    if (!this.stage || (dx === 0 && dy === 0)) return
+    const node = this.nodes.get(this.activeLayerId)
+    if (!node?.image.visible()) return
+    const before = this.getLayerOffset(this.activeLayerId)
+    const after = { x: before.x + dx, y: before.y + dy }
+    this.setLayerOffset(this.activeLayerId, after)
+    this.onMoveCommitted?.({ layerId: this.activeLayerId, before, after })
+  }
+
   endStroke() {
     const target = this.target
     if (!target) return
+
+    if (this.brush.tool === "select") {
+      // The layer's image is already at its new offset. Commit only a real move; a click with
+      // no drag (or a drag returned to origin) leaves nothing on the timeline.
+      const before = this.moveStartOffset
+      const after = this.getLayerOffset(this.strokeLayerId)
+      if (this.moveStart && (after.x !== before.x || after.y !== before.y)) {
+        this.onMoveCommitted?.({ layerId: this.strokeLayerId, before, after })
+      }
+      this.target = null
+      this.moveStart = null
+      return
+    }
+
     this.render() // bake the final state into the layer buffer
 
     // A shape click with no drag (zero width/height) paints nothing — skip the commit
@@ -299,6 +400,11 @@ export class CanvasEngine {
   /** Subscribe to committed strokes (the timeline records each as an undoable command). */
   setOnStrokeCommitted(cb: (commit: StrokeCommit) => void) {
     this.onStrokeCommitted = cb
+  }
+
+  /** Subscribe to committed moves (the timeline records each offset change as undoable). */
+  setOnMoveCommitted(cb: (commit: MoveCommit) => void) {
+    this.onMoveCommitted = cb
   }
 
   /** Overwrite a layer's pixels with a snapshot (undo/redo restore). Public so the
@@ -335,12 +441,18 @@ export class CanvasEngine {
     }
     if (!ctx) return
 
-    flattenLayers(ctx, this.layers, (id) => this.nodes.get(id)?.canvas, {
-      background,
-      backgroundColor: PAGE_BACKGROUND,
-      width: DOC_WIDTH,
-      height: DOC_HEIGHT,
-    })
+    flattenLayers(
+      ctx,
+      this.layers,
+      (id) => this.nodes.get(id)?.canvas,
+      {
+        background,
+        backgroundColor: PAGE_BACKGROUND,
+        width: DOC_WIDTH,
+        height: DOC_HEIGHT,
+      },
+      (id) => this.getLayerOffset(id),
+    )
 
     out.toBlob((blob) => {
       if (blob) downloadBlob(blob, toExportFilename("Untitled"))
@@ -368,12 +480,18 @@ export class CanvasEngine {
     }
     if (!ctx) return null
 
-    flattenLayers(ctx, this.layers, (id) => this.nodes.get(id)?.canvas, {
-      background: "white",
-      backgroundColor: PAGE_BACKGROUND,
-      width: DOC_WIDTH,
-      height: DOC_HEIGHT,
-    })
+    flattenLayers(
+      ctx,
+      this.layers,
+      (id) => this.nodes.get(id)?.canvas,
+      {
+        background: "white",
+        backgroundColor: PAGE_BACKGROUND,
+        width: DOC_WIDTH,
+        height: DOC_HEIGHT,
+      },
+      (id) => this.getLayerOffset(id),
+    )
 
     const d = ctx.getImageData(x, y, 1, 1).data
     return rgbaToHex(d[0] ?? 0, d[1] ?? 0, d[2] ?? 0)
@@ -388,8 +506,11 @@ export class CanvasEngine {
     if (!target?.image.visible()) return
     const point = this.screenToDoc(clientX, clientY)
     if (!point) return
-    const x = Math.floor(point.x)
-    const y = Math.floor(point.y)
+    // Fill in the layer's buffer-local space; a click where a moved layer no longer covers
+    // (buffer coord out of bounds) is a no-op.
+    const off = this.getLayerOffset(this.activeLayerId)
+    const x = Math.floor(point.x - off.x)
+    const y = Math.floor(point.y - off.y)
     if (x < 0 || y < 0 || x >= DOC_WIDTH || y >= DOC_HEIGHT) return
 
     const before = this.cloneCanvas(target.canvas)
