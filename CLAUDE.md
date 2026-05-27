@@ -32,7 +32,8 @@ Two things that still shape any change:
   layer-preview cache in `src/editor/state/thumbnailStore.ts` (layerId → dataURL, fed by the
   engine — see Layers panel below), and the **canvas viewport** (zoom **+ pan**) in
   `src/editor/state/viewportStore.ts`. That was the last planned store — only **tool, brush
-  params, colours (foreground + background; X swaps, D resets), and panel chrome** remain in the local `useReducer`
+  params, colours (foreground + secondary; X swaps, D resets — `secondaryColor` is a painting
+  colour-memory, *not* the document background), and panel chrome** remain in the local `useReducer`
   (`src/editor/state/useEditorState.ts`). The viewport store is the single source of truth for
   the view (`{zoom, panX, panY}` + the reported container size); `CanvasStage` applies it to the
   engine (`setView`) and routes navigation gestures back to it, with the *pure* view math in
@@ -103,6 +104,12 @@ Two load-bearing rules:
   real." The **Move tool's free transform upholds this**: a layer's `{x,y,scaleX,scaleY,rotation}`
   lives in the **engine** (a `Map<layerId, Transform>` in `CanvasEngine`, see `transform.ts`), *not*
   as a field on the model — "transforms are engine-phase." Non-uniform scale; skew/flip deferred.
+  The one piece of *metadata* it does carry beyond the obvious is **`background?: boolean`** — the
+  document's pinned **Background** layer: a real (locked) raster layer at the bottom of the stack,
+  white by default, that can't be deleted / reordered / duplicated. The engine seeds its buffer
+  white once on node creation (`syncLayers`); the Layers panel pins + locks its row; `documentStore`
+  guards the delete/move/duplicate ops; it persists in `.design` like any layer (additive flag).
+  **Distinct from the rail's `secondaryColor`** — that's a painting colour slot, this is the paper.
 - **Design tokens (Tailwind v4, CSS-first):** `src/theme/base.tokens.css` holds the
   **shared** Boojy tokens (surfaces, text, semantics) in an `@theme` block;
   `src/theme/accent.design.css` holds the **per-product accent** (amber). Reskinning to
@@ -168,7 +175,8 @@ brush/eraser (**hold Shift** = straight line from the press point to the cursor,
 preview, anchored at `strokeOrigin`; pointer-move-driven, so no stationary-Shift toggle) +
 editable foreground colour + PNG export (menu / ⌘E) + image import (Import
 image… / drag-drop, fit-centered new layer; **not undoable** — adds a layer outside the
-timeline) + layer ops (drag-reorder via dnd-kit, inline rename, duplicate-with-pixels, delete)
+timeline) + layer ops (drag-reorder via dnd-kit, inline rename, duplicate-with-pixels, delete) +
+a pinned, locked white **Background** layer (`Layer.background`; see the `types.ts` note above)
 + document model in Zustand (`documentStore`) + **unified undo/redo** (`undoStore`, a `Command`
 stack — see `commands.ts`): strokes and every layer op share one linear timeline, including
 **undo-delete** (the deleted layer's pixels are captured and replayed); plain layer selection

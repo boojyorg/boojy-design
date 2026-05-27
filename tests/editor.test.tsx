@@ -167,7 +167,7 @@ describe("EditorV1 shell", () => {
 
   it("selects a layer on click", () => {
     renderEditor()
-    // The document opens with one layer; add a second so there's something to select between.
+    // The document opens with a working "Layer 1" (active) over the pinned Background.
     expect(screen.getByRole("option", { name: "Layer 1", selected: true })).toBeInTheDocument()
     fireEvent.click(screen.getByRole("button", { name: "Add layer" }))
     expect(screen.getByRole("option", { name: "Layer 2", selected: true })).toBeInTheDocument()
@@ -177,16 +177,31 @@ describe("EditorV1 shell", () => {
     expect(screen.getByRole("option", { name: "Layer 2", selected: false })).toBeInTheDocument()
   })
 
+  it("opens with a pinned Background layer at the bottom (locked: no reorder/delete)", () => {
+    renderEditor()
+    // Two rows by default: Layer 1 (active) + Background.
+    const options = screen.getAllByRole("option")
+    expect(options).toHaveLength(2)
+    expect(screen.getByRole("option", { name: "Background" })).toBeInTheDocument()
+    // The Background row has no drag handle (it's pinned).
+    expect(screen.queryByRole("button", { name: "Reorder Background" })).not.toBeInTheDocument()
+
+    // Selecting it disables Delete + Duplicate.
+    fireEvent.click(screen.getByRole("option", { name: "Background" }))
+    expect(screen.getByRole("button", { name: "Delete layer" })).toBeDisabled()
+    expect(screen.getByRole("button", { name: "Duplicate layer" })).toBeDisabled()
+  })
+
   it("adds a new active layer and deletes the active layer", () => {
     renderEditor()
-    expect(screen.getAllByRole("option")).toHaveLength(1)
+    expect(screen.getAllByRole("option")).toHaveLength(2) // Layer 1 + Background
 
     fireEvent.click(screen.getByRole("button", { name: "Add layer" }))
-    expect(screen.getAllByRole("option")).toHaveLength(2)
+    expect(screen.getAllByRole("option")).toHaveLength(3)
     expect(screen.getByRole("option", { name: "Layer 2", selected: true })).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole("button", { name: "Delete layer" }))
-    expect(screen.getAllByRole("option")).toHaveLength(1)
+    expect(screen.getAllByRole("option")).toHaveLength(2)
     expect(screen.queryByRole("option", { name: "Layer 2" })).not.toBeInTheDocument()
   })
 
@@ -225,29 +240,29 @@ describe("EditorV1 shell", () => {
     )
   })
 
-  it("swaps (X) and resets (D) the foreground/background colours", () => {
+  it("swaps (X) and resets (D) the foreground/secondary colours", () => {
     renderEditor()
     // Scope FG to the rail — the top bar's colour chip shares the "Foreground color" label.
     const rail = screen.getByRole("navigation", { name: "Tools" })
     const fg = () => within(rail).getByRole("button", { name: "Foreground color" })
-    const bg = () => screen.getByRole("button", { name: "Background color" })
+    const sec = () => screen.getByRole("button", { name: "Secondary color" })
 
-    // D resets to black FG / white BG.
+    // D resets to black FG / white secondary.
     fireEvent.keyDown(document.body, { key: "d" })
     expect(fg().style.backgroundColor).toBe("rgb(0, 0, 0)")
-    expect(bg().style.backgroundColor).toBe("rgb(255, 255, 255)")
+    expect(sec().style.backgroundColor).toBe("rgb(255, 255, 255)")
 
     // X swaps the two.
     fireEvent.keyDown(document.body, { key: "x" })
     expect(fg().style.backgroundColor).toBe("rgb(255, 255, 255)")
-    expect(bg().style.backgroundColor).toBe("rgb(0, 0, 0)")
+    expect(sec().style.backgroundColor).toBe("rgb(0, 0, 0)")
 
     // The rail's swap button does the same.
     fireEvent.click(
-      within(rail).getByRole("button", { name: "Swap foreground and background colors" }),
+      within(rail).getByRole("button", { name: "Swap foreground and secondary colors" }),
     )
     expect(fg().style.backgroundColor).toBe("rgb(0, 0, 0)")
-    expect(bg().style.backgroundColor).toBe("rgb(255, 255, 255)")
+    expect(sec().style.backgroundColor).toBe("rgb(255, 255, 255)")
   })
 
   it("ignores shortcuts for the non-MVP Text tool (T does nothing)", () => {
@@ -278,9 +293,9 @@ describe("EditorV1 shell", () => {
 
   it("duplicates the active layer above itself", () => {
     renderEditor()
-    expect(screen.getAllByRole("option")).toHaveLength(1)
+    expect(screen.getAllByRole("option")).toHaveLength(2) // Layer 1 + Background
     fireEvent.click(screen.getByRole("button", { name: "Duplicate layer" }))
-    expect(screen.getAllByRole("option")).toHaveLength(2)
+    expect(screen.getAllByRole("option")).toHaveLength(3)
     expect(screen.getByRole("option", { name: "Layer 1 copy", selected: true })).toBeInTheDocument()
   })
 })
@@ -301,20 +316,21 @@ describe("unified undo timeline", () => {
 
   it("undoes and redoes a layer delete (the layer comes back)", () => {
     renderEditor()
-    // Add a second layer first — the last remaining layer can't be deleted.
+    // Default stack is Layer 1 + Background (2 rows); add a third so the delete isn't the
+    // last-layer no-op.
     fireEvent.click(screen.getByRole("button", { name: "Add layer" })) // adds Layer 2 (active)
-    expect(screen.getAllByRole("option")).toHaveLength(2)
+    expect(screen.getAllByRole("option")).toHaveLength(3)
 
     fireEvent.click(screen.getByRole("button", { name: "Delete layer" })) // removes Layer 2
-    expect(screen.getAllByRole("option")).toHaveLength(1)
+    expect(screen.getAllByRole("option")).toHaveLength(2)
     expect(screen.queryByRole("option", { name: "Layer 2" })).not.toBeInTheDocument()
 
     fireEvent.click(screen.getByRole("button", { name: "Undo" }))
-    expect(screen.getAllByRole("option")).toHaveLength(2)
+    expect(screen.getAllByRole("option")).toHaveLength(3)
     expect(screen.getByRole("option", { name: "Layer 2", selected: true })).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole("button", { name: "Redo" }))
-    expect(screen.getAllByRole("option")).toHaveLength(1)
+    expect(screen.getAllByRole("option")).toHaveLength(2)
     expect(screen.queryByRole("option", { name: "Layer 2" })).not.toBeInTheDocument()
   })
 

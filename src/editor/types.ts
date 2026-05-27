@@ -25,4 +25,7 @@ export interface Layer {
   opacity: number
   /** vector layers only */
   kind?: VectorKind
+  /** The document's pinned background layer: opaque paper at the bottom of the stack,
+   *  locked from delete / reorder / duplicate. Just one per document. */
+  background?: boolean
 }

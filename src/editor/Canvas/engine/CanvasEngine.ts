@@ -245,6 +245,14 @@ export class CanvasEngine {
         node = created
         this.nodes.set(layer.id, created)
         this.layer.add(created.image)
+        // Seed a fresh background layer with the opaque paper colour. On *open* the layers
+        // effect runs restorePixels right after this sync, overwriting the seed with the
+        // saved pixels; on a *new* document there's no restore, so the white persists. Only
+        // fires on creation — re-syncs hit the `node` branch, so painting is never cleared.
+        if (layer.background) {
+          created.ctx.fillStyle = PAGE_BACKGROUND
+          created.ctx.fillRect(0, 0, DOC_WIDTH, DOC_HEIGHT)
+        }
       }
       node.image.visible(layer.visible)
       node.image.opacity(layer.opacity / 100)

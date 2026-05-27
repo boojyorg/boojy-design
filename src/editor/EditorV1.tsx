@@ -183,11 +183,11 @@ export function EditorV1() {
           <LeftRail
             activeTool={state.activeTool}
             foreground={state.foreground}
-            background={state.background}
+            secondaryColor={state.secondaryColor}
             shapeKind={state.shapeKind}
             onSelectTool={(tool) => dispatch({ type: "setTool", tool })}
             onForeground={(color) => dispatch({ type: "setForeground", color })}
-            onBackground={(color) => dispatch({ type: "setBackground", color })}
+            onSecondaryColor={(color) => dispatch({ type: "setSecondaryColor", color })}
             onSwapColors={() => dispatch({ type: "swapColors" })}
           />
           {state.activeTool === "shape" && (
