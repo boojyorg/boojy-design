@@ -44,18 +44,19 @@ export function clearRegion(
   docHeight: number,
 ): void {
   // Map the four doc-space corners of the selection rect back to buffer space via invert().
-  const corners = [
+  const [c0, c1, c2, c3] = [
     invert(transform, { x: rect.x, y: rect.y }),
     invert(transform, { x: rect.x + rect.w, y: rect.y }),
     invert(transform, { x: rect.x + rect.w, y: rect.y + rect.h }),
     invert(transform, { x: rect.x, y: rect.y + rect.h }),
   ]
+  if (!c0 || !c1 || !c2 || !c3) return
   targetCtx.save()
   targetCtx.beginPath()
-  targetCtx.moveTo(corners[0]!.x, corners[0]!.y)
-  targetCtx.lineTo(corners[1]!.x, corners[1]!.y)
-  targetCtx.lineTo(corners[2]!.x, corners[2]!.y)
-  targetCtx.lineTo(corners[3]!.x, corners[3]!.y)
+  targetCtx.moveTo(c0.x, c0.y)
+  targetCtx.lineTo(c1.x, c1.y)
+  targetCtx.lineTo(c2.x, c2.y)
+  targetCtx.lineTo(c3.x, c3.y)
   targetCtx.closePath()
   targetCtx.clip()
   targetCtx.clearRect(0, 0, docWidth, docHeight)
