@@ -311,27 +311,25 @@ export class CanvasEngine {
 
     if (this.brush.tool === "select") {
       // Free transform: a handle picks scale/rotate, inside the box moves.
-      // A miss auto-selects the top-most visible layer with a non-transparent pixel at
-      // the click point (transform-aware). Falls back to no-op if nothing is hit.
+      // Before committing to any gesture, check whether a layer *above* the current one
+      // has a non-transparent pixel at the click point — if so, auto-select it instead.
+      // This handles the common case of clicking a layer that sits on top of the active
+      // one (e.g. clicking Layer 1 while Background is active).
+      const activeIndex = this.layers.findIndex((l) => l.id === this.activeLayerId)
+      const topHit = this.pixelHitLayer(point, 0, activeIndex)
+      if (topHit) {
+        this.target = null
+        this.onLayerAutoSelected?.(topHit)
+        return
+      }
+
+      // No layer above is hit — apply the normal gesture (handles or box interior).
       const gesture = this.hitTest(point)
       if (!gesture) {
         this.target = null
-        // Walk layers top→bottom (layers[0] = topmost) looking for one whose pixel at
-        // the click point is non-transparent.
-        for (const layer of this.layers) {
-          if (!layer.visible) continue
-          const node = this.nodes.get(layer.id)
-          if (!node) continue
-          const local = invert(this.getLayerTransform(layer.id), point)
-          const px = Math.round(local.x)
-          const py = Math.round(local.y)
-          if (px < 0 || py < 0 || px >= DOC_WIDTH || py >= DOC_HEIGHT) continue
-          const [, , , a] = node.ctx.getImageData(px, py, 1, 1).data
-          if ((a ?? 0) > 0) {
-            if (layer.id !== this.activeLayerId) this.onLayerAutoSelected?.(layer.id)
-            return
-          }
-        }
+        // Miss on the current layer too: walk layers below for a hit.
+        const belowHit = this.pixelHitLayer(point, activeIndex + 1)
+        if (belowHit) this.onLayerAutoSelected?.(belowHit)
         return
       }
       this.moveStart = point
@@ -937,6 +935,24 @@ export class CanvasEngine {
 
   /** Which gesture a doc-space press starts: the rotate grip, a scale handle (0–7), a move (inside
    *  the box) or null (outside). Grip first (it sits outside the box), then handles, then interior. */
+  /** Walk `this.layers[from..to)` top→bottom and return the first visible layer id that has
+   *  a non-transparent pixel at `point` (doc-space, transform-aware). `to` defaults to end. */
+  private pixelHitLayer(point: Point, from = 0, to = this.layers.length): string | null {
+    for (let i = from; i < to; i++) {
+      const layer = this.layers[i]
+      if (!layer?.visible) continue
+      const node = this.nodes.get(layer.id)
+      if (!node) continue
+      const local = invert(this.getLayerTransform(layer.id), point)
+      const px = Math.round(local.x)
+      const py = Math.round(local.y)
+      if (px < 0 || py < 0 || px >= DOC_WIDTH || py >= DOC_HEIGHT) continue
+      const [, , , a] = node.ctx.getImageData(px, py, 1, 1).data
+      if ((a ?? 0) > 0) return layer.id
+    }
+    return null
+  }
+
   private hitTest(pressDoc: Point): Gesture | null {
     const box = this.activeContentBox()
     if (!box) return null
