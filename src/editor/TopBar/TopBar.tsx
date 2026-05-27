@@ -13,17 +13,21 @@ interface TopBarProps {
   hardness: number
   opacity: number
   foreground: string
+  fillTolerance: number
   zoom: number
   rightCollapsed: boolean
   onBrushSize: (v: number) => void
   onHardness: (v: number) => void
   onOpacity: (v: number) => void
   onForeground: (color: string) => void
+  onFillTolerance: (v: number) => void
   onZoomIn: () => void
   onZoomOut: () => void
   onToggleRight: () => void
   onExport: () => void
   onOpen: () => void
+  onSave: () => void
+  onImportImage: () => void
   onUndo: () => void
   onRedo: () => void
   canUndo: boolean
@@ -38,7 +42,12 @@ function Divider({ height }: { height: number }) {
 export function TopBar(props: TopBarProps) {
   return (
     <header className="flex h-13 shrink-0 items-center gap-3 border-divider border-b bg-chrome pl-4">
-      <AppMenu onExport={props.onExport} onOpen={props.onOpen} />
+      <AppMenu
+        onOpen={props.onOpen}
+        onSave={props.onSave}
+        onImportImage={props.onImportImage}
+        onExport={props.onExport}
+      />
       <Divider height={28} />
       <FilenameField name="Untitled" dirty />
 
@@ -68,10 +77,12 @@ export function TopBar(props: TopBarProps) {
           hardness={props.hardness}
           opacity={props.opacity}
           foreground={props.foreground}
+          fillTolerance={props.fillTolerance}
           onBrushSize={props.onBrushSize}
           onHardness={props.onHardness}
           onOpacity={props.onOpacity}
           onForeground={props.onForeground}
+          onFillTolerance={props.onFillTolerance}
         />
       </div>
 

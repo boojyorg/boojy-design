@@ -1,6 +1,5 @@
-import { useDocumentStore } from "@/editor/state/documentStore"
+import { type DocumentSnapshot, useDocumentStore } from "@/editor/state/documentStore"
 import type { Command } from "@/editor/state/undoStore"
-import type { Layer } from "@/editor/types"
 
 /**
  * Command factories for the unified undo timeline. Each turns a user intent into a
@@ -11,12 +10,6 @@ import type { Layer } from "@/editor/types"
  * `layers` array, so no per-op inverse logic. Pixel-bearing ops (delete/duplicate)
  * additionally capture a layer's pixels and replay them through the {@link PixelPort}.
  */
-
-interface DocumentSnapshot {
-  layers: Layer[]
-  activeLayerId: string
-  nextLayerNum: number
-}
 
 /** The pixel operations the timeline needs from the engine, via the CanvasStage handle. */
 export interface PixelPort {

@@ -8,6 +8,7 @@ const meta = {
   args: {
     activeTool: "brush",
     foreground: "#E89940",
+    shapeKind: "rect",
     onSelectTool: () => {},
     onForeground: () => {},
   },

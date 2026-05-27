@@ -3,7 +3,7 @@
  * `src/editor/types.ts` (which stays thin and serializable) — pixel buffers,
  * stamp geometry and brush params belong to the engine, not the reducer.
  */
-import type { ToolId } from "@/editor/types"
+import type { ToolId, VectorKind } from "@/editor/types"
 
 export interface Point {
   x: number
@@ -28,6 +28,10 @@ export interface BrushParams {
   opacity: number
   /** 0–100. 100 = hard disc, 0 = fully feathered. */
   hardness: number
+  /** Which primitive the Shape tool fills (ignored by brush/eraser). Defaults to "rect". */
+  shapeKind?: VectorKind
+  /** Fill tool match looseness, 0–100 (ignored by other tools). */
+  tolerance?: number
 }
 
 /** Fixed document size for this slice (the first real "page"). */

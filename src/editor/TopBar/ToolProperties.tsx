@@ -1,10 +1,8 @@
-import { Circle, Square } from "lucide-react"
-import { type ComponentProps, forwardRef, type ReactNode, useState } from "react"
+import { type ComponentProps, forwardRef, type ReactNode } from "react"
 import { ColorPopover } from "@/components/ColorPopover"
 import { NumChip } from "@/components/NumChip"
 import { Slider } from "@/components/ui/slider"
 import type { ToolId } from "@/editor/types"
-import { cn } from "@/lib/cn"
 
 interface ToolPropertiesProps {
   tool: ToolId
@@ -12,10 +10,12 @@ interface ToolPropertiesProps {
   hardness: number
   opacity: number
   foreground: string
+  fillTolerance: number
   onBrushSize: (v: number) => void
   onHardness: (v: number) => void
   onOpacity: (v: number) => void
   onForeground: (color: string) => void
+  onFillTolerance: (v: number) => void
 }
 
 function ToolProp({ label, children }: { label: string; children: ReactNode }) {
@@ -80,13 +80,13 @@ export function ToolProperties({
   hardness,
   opacity,
   foreground,
+  fillTolerance,
   onBrushSize,
   onHardness,
   onOpacity,
   onForeground,
+  onFillTolerance,
 }: ToolPropertiesProps) {
-  const [shapeKind, setShapeKind] = useState<"rect" | "ellipse">("rect")
-
   if (tool === "brush" || tool === "eraser") {
     return (
       <div className="flex items-center gap-[18px]" data-testid="tool-props">
@@ -120,41 +120,31 @@ export function ToolProperties({
     )
   }
 
+  if (tool === "fill") {
+    return (
+      <div className="flex items-center gap-[18px]" data-testid="tool-props">
+        <ToolProp label="Tolerance">
+          <PropSlider
+            label="Tolerance"
+            value={fillTolerance}
+            width={100}
+            onChange={onFillTolerance}
+          />
+          <NumChip value={fillTolerance} />
+        </ToolProp>
+        <ToolProp label="Color">
+          <ColorPopover value={foreground} onChange={onForeground}>
+            <ColorChip color={foreground} />
+          </ColorPopover>
+        </ToolProp>
+      </div>
+    )
+  }
+
   if (tool === "shape") {
+    // The rect/ellipse picker lives in the floating ShapeFlyout; only Fill here.
     return (
       <div className="flex items-center gap-3" data-testid="tool-props">
-        <ToolProp label="Shape">
-          <div className="flex gap-0.5 rounded-md border border-divider bg-darkest p-0.5">
-            <button
-              type="button"
-              aria-label="Rectangle"
-              aria-pressed={shapeKind === "rect"}
-              onClick={() => setShapeKind("rect")}
-              className={cn(
-                "flex h-6 w-[26px] items-center justify-center rounded transition-colors",
-                shapeKind === "rect"
-                  ? "bg-accent-dim text-accent"
-                  : "text-fg-dim hover:bg-hover hover:text-fg",
-              )}
-            >
-              <Square size={14} />
-            </button>
-            <button
-              type="button"
-              aria-label="Ellipse"
-              aria-pressed={shapeKind === "ellipse"}
-              onClick={() => setShapeKind("ellipse")}
-              className={cn(
-                "flex h-6 w-[26px] items-center justify-center rounded transition-colors",
-                shapeKind === "ellipse"
-                  ? "bg-accent-dim text-accent"
-                  : "text-fg-dim hover:bg-hover hover:text-fg",
-              )}
-            >
-              <Circle size={14} />
-            </button>
-          </div>
-        </ToolProp>
         <ToolProp label="Fill">
           <ColorPopover value={foreground} onChange={onForeground}>
             <ColorChip color={foreground} />
@@ -169,7 +159,9 @@ export function ToolProperties({
       ? "Drag to move · click a layer to select"
       : tool === "hand"
         ? "Drag to pan · scroll to zoom"
-        : "Text tool — coming in v0.5"
+        : tool === "eyedropper"
+          ? "Click the canvas to pick a colour"
+          : "Text tool — coming in v0.5"
 
   return (
     <span className="text-fg-faint text-xs italic" data-testid="tool-props">

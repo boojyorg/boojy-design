@@ -10,7 +10,9 @@ describe("PNG export wiring", () => {
   it("fires onExport when the Export… menu item is selected", async () => {
     const user = userEvent.setup()
     const onExport = vi.fn()
-    render(<AppMenu onExport={onExport} onOpen={() => {}} />)
+    render(
+      <AppMenu onExport={onExport} onOpen={() => {}} onSave={() => {}} onImportImage={() => {}} />,
+    )
 
     await user.click(screen.getByRole("button")) // open the Design menu
     await user.click(await screen.findByText("Export…"))
@@ -40,6 +42,30 @@ describe("editable foreground colour", () => {
     act(() => result.current[1]({ type: "setForeground", color: "#123456" }))
 
     expect(result.current[0].foreground).toBe("#123456")
+  })
+
+  it("eyedropper remembers the previous tool and snaps back on sample", () => {
+    const { result } = renderHook(() => useEditorState())
+    const dispatch = () => result.current[1]
+
+    // Enter the eyedropper from Brush → previousTool recorded.
+    act(() => dispatch()({ type: "setTool", tool: "eyedropper" }))
+    expect(result.current[0].activeTool).toBe("eyedropper")
+    expect(result.current[0].previousTool).toBe("brush")
+
+    // Sampling sets the colour and returns to the pre-eyedropper tool.
+    act(() => dispatch()({ type: "applySampledColor", color: "#00FF00" }))
+    expect(result.current[0].foreground).toBe("#00FF00")
+    expect(result.current[0].activeTool).toBe("brush")
+  })
+
+  it("setFillTolerance updates the fill tolerance in state", () => {
+    const { result } = renderHook(() => useEditorState())
+    expect(result.current[0].fillTolerance).toBe(20)
+
+    act(() => result.current[1]({ type: "setFillTolerance", value: 50 }))
+
+    expect(result.current[0].fillTolerance).toBe(50)
   })
 
   it("opens the colour picker from the brush colour chip", async () => {
