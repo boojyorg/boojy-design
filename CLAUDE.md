@@ -52,8 +52,10 @@ secret-guarded (skip gracefully without `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACC
 ## Architecture
 
 - **`src/editor/`** — the shell, split by region: `TopBar/` (incl. `ToolProperties`, the
-  dynamic per-tool zone), `LeftRail/`, `Canvas/`, `RightSidebar/`. `EditorV1.tsx` owns the
-  reducer and passes state + handlers down; regions are otherwise presentational.
+  dynamic per-tool zone), `LeftRail/`, `Canvas/`, `RightSidebar/`. `EditorV1.tsx` is the
+  composition root — it owns the shell reducer, reads the document/undo stores, wraps layer
+  ops in undo commands (`commands.ts`), and orchestrates save/open; regions are otherwise
+  presentational.
 - **`src/lib/tools.ts`** — the tool registry. Each tool has an `mvp` flag. Non-MVP tools
   (Move, Text) are shown **dimmed with a "coming in v0.5" tooltip**, and keyboard shortcuts
   (`src/hooks/useKeyboardShortcuts.ts`) act on MVP tools only. Keep the rail and the

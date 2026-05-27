@@ -37,7 +37,9 @@ shadcn-style Radix primitives · react-colorful · dnd-kit · Lucide · Vitest +
 - `src/editor/` — the editor, by region (`TopBar/`, `LeftRail/`, `Canvas/`, `RightSidebar/`).
 - `src/editor/Canvas/engine/` — the imperative Konva engine behind the canvas seam (brush/eraser, per-layer pixel buffers, viewport math).
 - `src/editor/state/documentStore.ts` — Zustand store for the document model (layer stack + active layer).
+- `src/editor/state/undoStore.ts` — Zustand undo/redo timeline (a stack of commands; see `commands.ts`).
 - `src/editor/state/useEditorState.ts` — local reducer for the rest of the shell (tool, brush, zoom, panel chrome).
+- `src/lib/designFile.ts` — `.design` save/open format (layer metadata + embedded base64 PNGs).
 - `src/components/` — reusable primitives (+ `ui/` shadcn-style Radix wrappers).
 - `src/theme/base.tokens.css` — shared Boojy tokens; `accent.design.css` — the per-product amber (the single swap point for other Boojy products).
 

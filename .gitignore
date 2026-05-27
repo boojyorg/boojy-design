@@ -26,3 +26,6 @@ coverage
 
 *storybook.log
 storybook-static
+
+# Claude Code — personal per-project overrides (settings.json is shared/committed)
+.claude/settings.local.json
