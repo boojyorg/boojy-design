@@ -160,30 +160,34 @@ describe("EditorV1 shell", () => {
 
   it("toggles a layer's visibility", () => {
     renderEditor()
-    const hide = screen.getByRole("button", { name: "Hide Layer 4" })
+    const hide = screen.getByRole("button", { name: "Hide Layer 1" })
     fireEvent.click(hide)
-    expect(screen.getByRole("button", { name: "Show Layer 4" })).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "Show Layer 1" })).toBeInTheDocument()
   })
 
   it("selects a layer on click", () => {
     renderEditor()
-    expect(screen.getByRole("option", { name: "Layer 4", selected: true })).toBeInTheDocument()
+    // The document opens with one layer; add a second so there's something to select between.
+    expect(screen.getByRole("option", { name: "Layer 1", selected: true })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole("button", { name: "Add layer" }))
+    expect(screen.getByRole("option", { name: "Layer 2", selected: true })).toBeInTheDocument()
+
     fireEvent.click(screen.getByRole("option", { name: "Layer 1" }))
     expect(screen.getByRole("option", { name: "Layer 1", selected: true })).toBeInTheDocument()
-    expect(screen.getByRole("option", { name: "Layer 4", selected: false })).toBeInTheDocument()
+    expect(screen.getByRole("option", { name: "Layer 2", selected: false })).toBeInTheDocument()
   })
 
   it("adds a new active layer and deletes the active layer", () => {
     renderEditor()
-    expect(screen.getAllByRole("option")).toHaveLength(4)
+    expect(screen.getAllByRole("option")).toHaveLength(1)
 
     fireEvent.click(screen.getByRole("button", { name: "Add layer" }))
-    expect(screen.getAllByRole("option")).toHaveLength(5)
-    expect(screen.getByRole("option", { name: "Layer 5", selected: true })).toBeInTheDocument()
+    expect(screen.getAllByRole("option")).toHaveLength(2)
+    expect(screen.getByRole("option", { name: "Layer 2", selected: true })).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole("button", { name: "Delete layer" }))
-    expect(screen.getAllByRole("option")).toHaveLength(4)
-    expect(screen.queryByRole("option", { name: "Layer 5" })).not.toBeInTheDocument()
+    expect(screen.getAllByRole("option")).toHaveLength(1)
+    expect(screen.queryByRole("option", { name: "Layer 2" })).not.toBeInTheDocument()
   })
 
   it("collapses the sidebar without removing the reserved canvas layout space", () => {
@@ -239,20 +243,20 @@ describe("EditorV1 shell", () => {
 
   it("renames a layer inline via double-click", () => {
     renderEditor()
-    fireEvent.doubleClick(screen.getByText("Layer 4"))
-    const input = screen.getByRole("textbox", { name: "Rename Layer 4" })
+    fireEvent.doubleClick(screen.getByText("Layer 1"))
+    const input = screen.getByRole("textbox", { name: "Rename Layer 1" })
     fireEvent.change(input, { target: { value: "Sky" } })
     fireEvent.keyDown(input, { key: "Enter" })
     expect(screen.getByRole("option", { name: "Sky" })).toBeInTheDocument()
-    expect(screen.queryByRole("option", { name: "Layer 4" })).not.toBeInTheDocument()
+    expect(screen.queryByRole("option", { name: "Layer 1" })).not.toBeInTheDocument()
   })
 
   it("duplicates the active layer above itself", () => {
     renderEditor()
-    expect(screen.getAllByRole("option")).toHaveLength(4)
+    expect(screen.getAllByRole("option")).toHaveLength(1)
     fireEvent.click(screen.getByRole("button", { name: "Duplicate layer" }))
-    expect(screen.getAllByRole("option")).toHaveLength(5)
-    expect(screen.getByRole("option", { name: "Layer 4 copy", selected: true })).toBeInTheDocument()
+    expect(screen.getAllByRole("option")).toHaveLength(2)
+    expect(screen.getByRole("option", { name: "Layer 1 copy", selected: true })).toBeInTheDocument()
   })
 })
 
@@ -272,29 +276,33 @@ describe("unified undo timeline", () => {
 
   it("undoes and redoes a layer delete (the layer comes back)", () => {
     renderEditor()
-    fireEvent.click(screen.getByRole("button", { name: "Delete layer" })) // removes Layer 4
-    expect(screen.getAllByRole("option")).toHaveLength(3)
-    expect(screen.queryByRole("option", { name: "Layer 4" })).not.toBeInTheDocument()
+    // Add a second layer first — the last remaining layer can't be deleted.
+    fireEvent.click(screen.getByRole("button", { name: "Add layer" })) // adds Layer 2 (active)
+    expect(screen.getAllByRole("option")).toHaveLength(2)
+
+    fireEvent.click(screen.getByRole("button", { name: "Delete layer" })) // removes Layer 2
+    expect(screen.getAllByRole("option")).toHaveLength(1)
+    expect(screen.queryByRole("option", { name: "Layer 2" })).not.toBeInTheDocument()
 
     fireEvent.click(screen.getByRole("button", { name: "Undo" }))
-    expect(screen.getAllByRole("option")).toHaveLength(4)
-    expect(screen.getByRole("option", { name: "Layer 4", selected: true })).toBeInTheDocument()
+    expect(screen.getAllByRole("option")).toHaveLength(2)
+    expect(screen.getByRole("option", { name: "Layer 2", selected: true })).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole("button", { name: "Redo" }))
-    expect(screen.getAllByRole("option")).toHaveLength(3)
-    expect(screen.queryByRole("option", { name: "Layer 4" })).not.toBeInTheDocument()
+    expect(screen.getAllByRole("option")).toHaveLength(1)
+    expect(screen.queryByRole("option", { name: "Layer 2" })).not.toBeInTheDocument()
   })
 
   it("undoes an inline rename", () => {
     renderEditor()
-    fireEvent.doubleClick(screen.getByText("Layer 4"))
-    const input = screen.getByRole("textbox", { name: "Rename Layer 4" })
+    fireEvent.doubleClick(screen.getByText("Layer 1"))
+    const input = screen.getByRole("textbox", { name: "Rename Layer 1" })
     fireEvent.change(input, { target: { value: "Sky" } })
     fireEvent.keyDown(input, { key: "Enter" })
     expect(screen.getByRole("option", { name: "Sky" })).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole("button", { name: "Undo" }))
-    expect(screen.getByRole("option", { name: "Layer 4" })).toBeInTheDocument()
+    expect(screen.getByRole("option", { name: "Layer 1" })).toBeInTheDocument()
     expect(screen.queryByRole("option", { name: "Sky" })).not.toBeInTheDocument()
   })
 })

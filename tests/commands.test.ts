@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest"
+import { beforeEach, describe, expect, it, vi } from "vitest"
 import {
   type PixelPort,
   runDeleteLayer,
@@ -7,8 +7,11 @@ import {
 } from "@/editor/state/commands"
 import { useDocumentStore } from "@/editor/state/documentStore"
 import type { Command } from "@/editor/state/undoStore"
+import { seedMockDocument } from "./fixtures"
 
-// vitest.setup resets documentStore before each test. INITIAL_LAYERS: ["l4","l3","l2","l1"].
+// The app default is a single layer; seed the multi-layer fixture so the layer
+// ops here are meaningful. MOCK_LAYERS: ["l4","l3","l2","l1"].
+beforeEach(seedMockDocument)
 function recorder() {
   const commands: Command[] = []
   return { record: (c: Command) => commands.push(c), commands }
