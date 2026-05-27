@@ -46,7 +46,9 @@ export function RightSidebar({
         // `inert` keeps Tab/focus out of the panel while it's slid off-screen.
         inert={collapsed || undefined}
         className={cn(
-          "absolute inset-0 flex flex-col border-divider border-l bg-chrome transition-[transform,opacity] duration-300 ease-[cubic-bezier(0.2,0.7,0.3,1)]",
+          // `transition` (default) covers both transform + opacity; the prior
+          // arbitrary `transition-[transform,opacity]` read as instant (no slide).
+          "absolute inset-0 flex flex-col border-divider border-l bg-chrome transition duration-300 ease-[cubic-bezier(0.2,0.7,0.3,1)]",
           collapsed
             ? "pointer-events-none translate-x-full opacity-0"
             : "translate-x-0 opacity-100",

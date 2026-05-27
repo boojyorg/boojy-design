@@ -1,10 +1,11 @@
 import { beforeEach, describe, expect, it } from "vitest"
-import { initialDocumentState, useDocumentStore } from "@/editor/state/documentStore"
+import { useDocumentStore } from "@/editor/state/documentStore"
+import { seedMockDocument } from "./fixtures"
 
-// Reset to fresh document state before each test (merge keeps the action fns).
-beforeEach(() => useDocumentStore.setState(initialDocumentState()))
-
-// INITIAL_LAYERS (mock-data) ids, index 0 = top: ["l4", "l3", "l2", "l1"].
+// Seed the multi-layer fixture before each test (the app default is a single layer,
+// but these ops only mean anything with a stack). MOCK_LAYERS ids, index 0 = top:
+// ["l4", "l3", "l2", "l1"].
+beforeEach(seedMockDocument)
 describe("documentStore layer ops", () => {
   it("moveLayer reorders, and a same-index move is a no-op (array unchanged)", () => {
     const store = useDocumentStore

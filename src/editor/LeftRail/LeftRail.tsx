@@ -46,7 +46,9 @@ export function LeftRail({
                   if (tool.mvp) onSelectTool(tool.id)
                 }}
                 className={cn(
-                  "flex size-11 items-center justify-center rounded-[9px] transition-colors",
+                  // No colour transition: the active highlight must land the instant you click,
+                  // not fade in over ~150ms (which reads as lag). Hover snaps too — fine for a rail.
+                  "flex size-11 items-center justify-center rounded-[9px]",
                   active ? "bg-accent-dim text-accent" : "text-fg-dim",
                   tool.mvp ? "hover:bg-elevated hover:text-fg" : "cursor-not-allowed opacity-40",
                 )}
