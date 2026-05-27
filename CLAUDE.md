@@ -15,22 +15,24 @@ landed and the **MVP paint loop is in place** — paint/erase in any colour acro
 `documentStore`, undo/redo is a **unified timeline** (`undoStore`) — strokes *and* every layer
 op (incl. undo-delete with pixels) on one stack — documents **save/open** as `.design`
 files (`src/lib/designFile.ts`), the **Shape tool** draws filled rect/ellipse (drag to
-size, Shift = square/circle) onto the active layer, and the **Move tool** repositions the active
-layer **non-destructively** via a per-layer display offset (pixels never leave the buffer).
-Next are the remaining v0.5 tools.
+size, Shift = square/circle) onto the active layer, the **Move tool** repositions the active
+layer **non-destructively** via a per-layer display offset (pixels never leave the buffer), and
+the **Layers panel shows live pixel thumbnails** per layer (fed by an engine `onLayerPixelsChanged`
+signal → `thumbnailStore`). Next are the remaining v0.5 tools.
 
 Two things that still shape any change:
 - **The canvas is a seam.** `src/editor/Canvas/CanvasStage.tsx` mounts the imperative Konva
   engine (`src/editor/Canvas/engine/CanvasEngine.ts`); all canvas/engine logic lives behind
   that seam — don't scatter it through the chrome.
 - **State is graduating from one reducer to Zustand stores.** The document model (layer
-  stack + active layer) lives in `src/editor/state/documentStore.ts`, and the undo timeline
-  in `src/editor/state/undoStore.ts` (a stack of `Command`s — see `commands.ts`). The rest —
-  tool, brush params, zoom, panel chrome — is still the local `useReducer`
-  (`src/editor/state/useEditorState.ts`). The one planned store left, `viewportStore` (zoom),
-  lands *as* that work does — introduce it then, not as a speculative refactor. **Both stores
-  are module singletons**, so tests reset them in `vitest.setup.ts` — any new store needs the
-  same.
+  stack + active layer) lives in `src/editor/state/documentStore.ts`, the undo timeline
+  in `src/editor/state/undoStore.ts` (a stack of `Command`s — see `commands.ts`), and the
+  layer-preview cache in `src/editor/state/thumbnailStore.ts` (layerId → dataURL, fed by the
+  engine — see Layers panel below). The rest — tool, brush params, zoom, panel chrome — is
+  still the local `useReducer` (`src/editor/state/useEditorState.ts`). The one planned store
+  left, `viewportStore` (zoom), lands *as* that work does — introduce it then, not as a
+  speculative refactor. **These stores are module singletons**, so tests reset them in
+  `vitest.setup.ts` — any new store needs the same.
 
 ## Commands
 
@@ -80,7 +82,11 @@ Two load-bearing rules:
   dynamic per-tool zone), `LeftRail/`, `Canvas/`, `RightSidebar/`. `EditorV1.tsx` is the
   composition root — it owns the shell reducer, reads the document/undo stores, wraps layer
   ops in undo commands (`commands.ts`), and orchestrates save/open; regions are otherwise
-  presentational.
+  presentational. The Layers panel's `LayerThumb` shows a live pixel preview: the engine fires
+  `onLayerPixelsChanged` after a buffer edit, `CanvasStage` turns it into a downscaled dataURL
+  (`getLayerThumbnail`, reusing `drawImageContain`) in `thumbnailStore`, and the row reads it
+  (falling back to a type icon until a layer has pixels). Note: pixel edits otherwise *don't*
+  reach React — this signal is the one bridge, so reuse it rather than adding new ones.
 - **`src/lib/tools.ts`** — the tool registry. Each tool has an `mvp` flag. The lone non-MVP
   tool (Text) is shown **dimmed with a "coming in v0.5" tooltip**, and keyboard shortcuts
   (`src/hooks/useKeyboardShortcuts.ts`) act on MVP tools only. Keep the rail and the

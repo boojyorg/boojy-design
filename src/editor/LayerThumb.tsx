@@ -1,7 +1,13 @@
+import { useThumbnailStore } from "@/editor/state/thumbnailStore"
 import type { Layer } from "@/editor/types"
 
-/** Tiny per-layer preview shown in the Layers panel. */
+/** Tiny per-layer preview shown in the Layers panel. Shows a downscaled snapshot of the
+ *  layer's pixels once it has any; falls back to a type-based placeholder until then. */
 export function LayerThumb({ layer }: { layer: Layer }) {
+  const dataUrl = useThumbnailStore((s) => s.cache.get(layer.id))
+  if (dataUrl) {
+    return <img src={dataUrl} alt="" className="h-full w-full object-contain" />
+  }
   if (layer.type === "image") {
     return (
       <div className="h-full w-full bg-[linear-gradient(180deg,#3A1F4D_0%,#C94A3C_50%,#F2A85B_100%)]" />
