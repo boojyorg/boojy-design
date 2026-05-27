@@ -28,11 +28,12 @@ export interface DocumentState {
   duplicateLayer: (id: string, newId: string) => void
 }
 
+/** The serialisable document slice — what persistence saves and what undo's mementos
+ *  snapshot. Excludes the action functions. */
+export type DocumentSnapshot = Pick<DocumentState, "layers" | "activeLayerId" | "nextLayerNum">
+
 /** Fresh initial document state (cloned so resets never alias the mock arrays). */
-export function initialDocumentState(): Pick<
-  DocumentState,
-  "layers" | "activeLayerId" | "nextLayerNum"
-> {
+export function initialDocumentState(): DocumentSnapshot {
   return {
     layers: INITIAL_LAYERS.map((l) => ({ ...l })),
     activeLayerId: INITIAL_ACTIVE_LAYER_ID,

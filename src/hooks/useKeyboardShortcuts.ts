@@ -11,20 +11,23 @@ const TOOL_KEYS: Record<string, ToolId> = Object.fromEntries(
 
 /**
  * Global editor shortcuts (disposable, like the rest of the shell state):
- * ⌘E/Ctrl+E exports, B/E/R/H select tools, [ ] nudge brush size, +/- zoom. Other
- * modifier combos and typing are ignored (so OS/browser shortcuts pass through).
+ * ⌘O opens a document, ⌘S saves, ⌘E exports, ⌘Z/⌘⇧Z undo/redo, B/E/R/H select
+ * tools, [ ] nudge brush size, +/- zoom. Other modifier combos and typing are
+ * ignored (so OS/browser shortcuts pass through).
  */
 export function useKeyboardShortcuts(
   dispatch: Dispatch<EditorAction>,
   opts?: {
     onExport?: () => void
     onOpen?: () => void
+    onSave?: () => void
     onUndo?: () => void
     onRedo?: () => void
   },
 ) {
   const onExport = opts?.onExport
   const onOpen = opts?.onOpen
+  const onSave = opts?.onSave
   const onUndo = opts?.onUndo
   const onRedo = opts?.onRedo
   useEffect(() => {
@@ -61,6 +64,11 @@ export function useKeyboardShortcuts(
           onOpen?.()
           return
         }
+        if (key === "s" && !e.shiftKey) {
+          e.preventDefault()
+          onSave?.()
+          return
+        }
       }
 
       if (e.metaKey || e.ctrlKey || e.altKey) return
@@ -91,5 +99,5 @@ export function useKeyboardShortcuts(
 
     window.addEventListener("keydown", onKeyDown)
     return () => window.removeEventListener("keydown", onKeyDown)
-  }, [dispatch, onExport, onOpen, onUndo, onRedo])
+  }, [dispatch, onExport, onOpen, onSave, onUndo, onRedo])
 }
