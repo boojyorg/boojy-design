@@ -16,6 +16,8 @@ import { type Bounds, contentBounds } from "@/editor/Canvas/engine/thumbnail"
 import {
   apply,
   boxCorners,
+  flipHorizontal,
+  flipVertical,
   HANDLES,
   IDENTITY,
   invert,
@@ -449,6 +451,17 @@ export class CanvasEngine {
     if (!node?.image.visible()) return
     const before = this.getLayerTransform(this.activeLayerId)
     const after = translateBy(before, dx, dy)
+    this.setLayerTransform(this.activeLayerId, after)
+    this.onMoveCommitted?.({ layerId: this.activeLayerId, before, after })
+  }
+
+  /** Flip the active layer along the given axis and commit as one undoable step. */
+  flipActiveLayer(axis: "h" | "v") {
+    if (!this.stage) return
+    const node = this.nodes.get(this.activeLayerId)
+    if (!node?.image.visible()) return
+    const before = this.getLayerTransform(this.activeLayerId)
+    const after = axis === "h" ? flipHorizontal(before) : flipVertical(before)
     this.setLayerTransform(this.activeLayerId, after)
     this.onMoveCommitted?.({ layerId: this.activeLayerId, before, after })
   }

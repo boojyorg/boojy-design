@@ -21,7 +21,8 @@ collapsible right sidebar.
 - **Shapes** — drag a filled rectangle or ellipse onto the active layer (Shift → square/circle).
 - **Move / transform** — a non-destructive 8-handle free transform: proportional corners (Shift =
   free), single-axis edges, a rotate grip (15° snap), drag-inside to move; rotation-aware cursors and
-  arrow-key nudges. Pixels never leave their buffer.
+  arrow-key nudges. **Flip H / Flip V** buttons in the top bar mirror the layer non-destructively.
+  Pixels never leave their buffer.
 - **Layers** — add, reorder (drag), rename, duplicate (with pixels), delete, toggle visibility, with
   a live thumbnail per layer. Every document opens with a locked white **Background** layer pinned
   at the bottom (recolour it by filling it; it saves/exports like any layer).
@@ -80,7 +81,7 @@ tests) · Storybook · Biome · pnpm.
 
 ## What's next
 
-- **Move: skew / flip** (negative scale).
+- **Move: skew** (shear — flip H/V already shipped).
 - **Text tool** — present in the rail, dimmed (`coming in v0.5`).
 - **Blend modes** (per-layer).
 - Later: selection/marquee, gradients, and tiling for larger documents.
@@ -98,4 +99,4 @@ Full history in [CHANGELOG.md](./CHANGELOG.md).
   pre-push (test) hooks, Dependabot weekly.
 - **Known limits:** naive single-composite render with a 50-layer cap; memory ceiling unvalidated
   (~800 MB estimated at 50 × 2K); tiling / dirty-rect tracking deferred; transforms cover
-  scale + rotate (skew/flip not yet).
+  scale + rotate + flip; skew deferred.

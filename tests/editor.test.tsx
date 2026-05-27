@@ -112,11 +112,12 @@ describe("EditorV1 shell", () => {
     expect(screen.getByRole("button", { name: "Fill (G)" })).toHaveAttribute("aria-pressed", "true")
   })
 
-  it("selects the Move tool (click or V) and shows the drag-to-move hint", () => {
+  it("selects the Move tool (click or V) and shows flip controls", () => {
     renderEditor()
     fireEvent.click(screen.getByRole("button", { name: "Move (V)" }))
     expect(screen.getByRole("button", { name: "Move (V)" })).toHaveAttribute("aria-pressed", "true")
-    expect(screen.getByTestId("tool-props")).toHaveTextContent("Drag a layer to move it")
+    expect(screen.getByRole("button", { name: "Flip horizontal" })).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "Flip vertical" })).toBeInTheDocument()
   })
 
   it("selects the Move tool with the V shortcut", () => {

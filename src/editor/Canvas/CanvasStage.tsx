@@ -52,6 +52,8 @@ export interface CanvasStageHandle {
   setLayerTransform: (layerId: string, transform: Transform) => void
   /** Drop all stored transforms (on opening a new document). */
   clearTransforms: () => void
+  /** Flip the active layer horizontally or vertically (undoable). */
+  flipActiveLayer: (axis: "h" | "v") => void
 }
 
 export const CanvasStage = forwardRef<CanvasStageHandle, CanvasStageProps>(
@@ -110,6 +112,7 @@ export const CanvasStage = forwardRef<CanvasStageHandle, CanvasStageProps>(
         setLayerTransform: (layerId, transform) =>
           engineRef.current?.setLayerTransform(layerId, transform),
         clearTransforms: () => engineRef.current?.clearTransforms(),
+        flipActiveLayer: (axis) => engineRef.current?.flipActiveLayer(axis),
       }),
       [importImage],
     )

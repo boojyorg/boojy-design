@@ -165,6 +165,8 @@ export function EditorV1() {
           onOpacity={(value) => dispatch({ type: "setOpacity", value })}
           onForeground={(color) => dispatch({ type: "setForeground", color })}
           onFillTolerance={(value) => dispatch({ type: "setFillTolerance", value })}
+          onFlipH={() => stageRef.current?.flipActiveLayer("h")}
+          onFlipV={() => stageRef.current?.flipActiveLayer("v")}
           onZoomIn={() => nudgeZoom(1)}
           onZoomOut={() => nudgeZoom(-1)}
           onZoomFit={fitView}

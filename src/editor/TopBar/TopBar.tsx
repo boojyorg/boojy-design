@@ -21,6 +21,8 @@ interface TopBarProps {
   onOpacity: (v: number) => void
   onForeground: (color: string) => void
   onFillTolerance: (v: number) => void
+  onFlipH: () => void
+  onFlipV: () => void
   onZoomIn: () => void
   onZoomOut: () => void
   onZoomFit: () => void
@@ -89,6 +91,8 @@ export function TopBar(props: TopBarProps) {
           onOpacity={props.onOpacity}
           onForeground={props.onForeground}
           onFillTolerance={props.onFillTolerance}
+          onFlipH={props.onFlipH}
+          onFlipV={props.onFlipV}
         />
       </div>
 

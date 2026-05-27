@@ -20,7 +20,8 @@ export interface Transform {
 
 export const IDENTITY: Transform = { x: 0, y: 0, scaleX: 1, scaleY: 1, rotation: 0 }
 
-/** Smallest scale a gesture may produce — keeps the transform invertible and prevents flipping. */
+/** Smallest scale a drag gesture may produce — keeps the transform invertible. Flip is done
+ *  explicitly via {@link flipHorizontal}/{@link flipVertical}, not by dragging through zero. */
 const MIN_SCALE = 0.02
 const clampScale = (v: number) => Math.max(MIN_SCALE, v)
 
@@ -117,6 +118,16 @@ export function resizeCursor(handleIndex: number, rotationDeg: number): string {
 /** Translate the transform by a document-space delta (the move gesture / arrow nudge). */
 export function translateBy(t: Transform, dx: number, dy: number): Transform {
   return { ...t, x: t.x + dx, y: t.y + dy }
+}
+
+/** Flip the layer horizontally (mirror left↔right) by negating scaleX. */
+export function flipHorizontal(t: Transform): Transform {
+  return { ...t, scaleX: -t.scaleX }
+}
+
+/** Flip the layer vertically (mirror top↔bottom) by negating scaleY. */
+export function flipVertical(t: Transform): Transform {
+  return { ...t, scaleY: -t.scaleY }
 }
 
 /**

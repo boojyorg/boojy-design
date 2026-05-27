@@ -210,7 +210,7 @@ move inside their buffer**. The box wraps the layer's content (reuses `contentBo
 `hitTest`s the grip/handles/interior to pick rotate/scale(index 0–7)/move. **Cursors** are
 handle-aware and *rotation-aware* (`resizeCursor` remaps `ns/ew/nesw/nwse` by 45° sectors; grip =
 grab/grabbing) — the engine sets `container.style.cursor` on hover (`pointerHover`), so CanvasStage
-leaves the cursor unset for `select`. Scale is **clamped positive (no flip)**. Drag off-page and
+leaves the cursor unset for `select`. Scale drag is **clamped positive** (can't flip by dragging through zero); explicit **Flip H / Flip V** buttons in the top bar (`flipHorizontal`/`flipVertical` in `transform.ts`) negate `scaleX`/`scaleY` directly and commit via the same `onMoveCommitted` path — undoable, negative scale is fully supported by `apply`/`invert`/`flattenLayers`. Drag off-page and
 back and the hidden part survives; off-page pixels are *clipped to the page* (the content layer is
 `clip`-bounded) on screen and in export, but kept in the buffer. Arrow keys nudge (1px, 10px with
 Shift). Undoable via a cheap **transform command** (before/after `{x,y,scaleX,scaleY,rotation}`, no
@@ -227,8 +227,8 @@ a constant size under zoom. Plus **viewport navigation** (`viewportStore` + `eng
 zoom % readout is a fit button); buttons + `+`/`-` step a **preset zoom ladder** (`ZOOM_STOPS`,
 Chrome-like — finer near 100%) around the viewport centre, while pinch/scroll stays continuous. Zoom **+ pan**
 live in `viewportStore` (the last reducer field to graduate); the math is pure + node-tested; view
-state is **not** persisted. **Next:** the remaining v0.5 tools below. Then v0.5+: Move *skew / flip*
-(negative scale), Text tool, blend modes. These aren't forbidden —
+state is **not** persisted. **Next:** the remaining v0.5 tools below. Then v0.5+: Move *skew*
+(shear transform — deferred; more complex than flip), Text tool, blend modes. These aren't forbidden —
 they're sequenced. Don't pile features onto the shell
 all at once; the **8-feature MVP cap** is the discipline lever. As a side-project this sits
 behind Igni / Boojy Audio / DELE — keep changes small and shippable.

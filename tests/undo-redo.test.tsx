@@ -21,6 +21,8 @@ function renderTopBar(overrides: Partial<ComponentProps<typeof TopBar>> = {}) {
     onOpacity: noop,
     onForeground: noop,
     onFillTolerance: noop,
+    onFlipH: noop,
+    onFlipV: noop,
     onZoomIn: noop,
     onZoomOut: noop,
     onZoomFit: noop,
