@@ -1,6 +1,6 @@
 import { create } from "zustand"
 import { DOC_HEIGHT, DOC_WIDTH } from "@/editor/Canvas/engine/types"
-import { fitView, type ViewState, zoomAtPoint } from "@/editor/Canvas/engine/viewport"
+import { fitView, nextZoomStop, type ViewState, zoomAtPoint } from "@/editor/Canvas/engine/viewport"
 
 /**
  * Canvas viewport — zoom (%) plus a pan offset (screen px), and the live container size
@@ -20,8 +20,9 @@ interface ViewportState extends ViewState {
   containerW: number
   containerH: number
   setContainerSize: (w: number, h: number) => void
-  /** Zoom by a percentage delta, anchored at the viewport centre (buttons / +/-). */
-  nudgeZoom: (delta: number) => void
+  /** Step to the next/previous zoom preset (sign of `dir` picks direction), anchored at
+   *  the viewport centre. Used by the +/- buttons and keys. */
+  nudgeZoom: (dir: number) => void
   /** Zoom by a multiplicative factor toward a screen point (wheel / pinch). */
   zoomAtCursor: (factor: number, screenX: number, screenY: number) => void
   /** Pan by a screen-space delta (scroll / drag). */
@@ -39,7 +40,7 @@ const INITIAL = { zoom: INITIAL_ZOOM, panX: 0, panY: 0, containerW: 1, container
 export const useViewportStore = create<ViewportState>()((set) => ({
   ...INITIAL,
   setContainerSize: (containerW, containerH) => set({ containerW, containerH }),
-  nudgeZoom: (delta) =>
+  nudgeZoom: (dir) =>
     set((s) =>
       zoomAtPoint(
         s,
@@ -47,7 +48,7 @@ export const useViewportStore = create<ViewportState>()((set) => ({
         s.containerH,
         DOC_WIDTH,
         DOC_HEIGHT,
-        s.zoom + delta,
+        nextZoomStop(s.zoom, dir),
         s.containerW / 2,
         s.containerH / 2,
       ),

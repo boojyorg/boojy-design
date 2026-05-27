@@ -207,7 +207,8 @@ re-applies it). The selection box + 8 handles draw on a **screen-space overlay**
 a constant size under zoom. Plus **viewport navigation** (`viewportStore` + `engine/viewport.ts`):
 **scroll-to-pan**, **pinch / ⌘-scroll zoom-toward-cursor** (both arrive as `ctrlKey` wheel events),
 **Space-drag** pan from any tool, the **Hand tool** (`H`) panning, and **⌘0 fit** / **⌘1 100%** (the
-zoom % readout is a fit button); buttons + `+`/`-` zoom around the viewport centre. Zoom **+ pan**
+zoom % readout is a fit button); buttons + `+`/`-` step a **preset zoom ladder** (`ZOOM_STOPS`,
+Chrome-like — finer near 100%) around the viewport centre, while pinch/scroll stays continuous. Zoom **+ pan**
 live in `viewportStore` (the last reducer field to graduate); the math is pure + node-tested; view
 state is **not** persisted. **Next:** the remaining v0.5 tools below. Then v0.5+: Move *skew / flip*
 (negative scale), Text tool, blend modes. These aren't forbidden —

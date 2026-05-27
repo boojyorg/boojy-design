@@ -137,12 +137,13 @@ describe("EditorV1 shell", () => {
 
   it("steps the zoom level with the +/- controls", () => {
     renderEditor()
+    // Buttons step a preset ladder (…67, 75, 80, 90…), not a fixed ±25.
     expect(screen.getByText("75%")).toBeInTheDocument()
     fireEvent.click(screen.getByRole("button", { name: "Zoom in" }))
-    expect(screen.getByText("100%")).toBeInTheDocument()
+    expect(screen.getByText("80%")).toBeInTheDocument()
     fireEvent.click(screen.getByRole("button", { name: "Zoom out" }))
     fireEvent.click(screen.getByRole("button", { name: "Zoom out" }))
-    expect(screen.getByText("50%")).toBeInTheDocument()
+    expect(screen.getByText("67%")).toBeInTheDocument()
   })
 
   it("updates a slider's value via keyboard", () => {
@@ -231,7 +232,7 @@ describe("EditorV1 shell", () => {
     renderEditor()
     expect(screen.getByText("75%")).toBeInTheDocument()
     fireEvent.keyDown(document.body, { key: "=" })
-    expect(screen.getByText("100%")).toBeInTheDocument()
+    expect(screen.getByText("80%")).toBeInTheDocument()
     fireEvent.keyDown(document.body, { key: "]" })
     expect(screen.getByText("35")).toBeInTheDocument()
   })

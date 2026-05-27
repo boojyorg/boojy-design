@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest"
-import { clampZoom, computeView, fitView, zoomAtPoint } from "@/editor/Canvas/engine/viewport"
+import {
+  clampZoom,
+  computeView,
+  fitView,
+  nextZoomStop,
+  zoomAtPoint,
+} from "@/editor/Canvas/engine/viewport"
 
 // Pure view math — no canvas needed, but lives with the other engine-math tests.
 const W = 800
@@ -66,5 +72,22 @@ describe("clampZoom", () => {
     expect(clampZoom(5)).toBe(10)
     expect(clampZoom(500)).toBe(400)
     expect(clampZoom(100)).toBe(100)
+  })
+})
+
+describe("nextZoomStop", () => {
+  it("steps to the next preset above and below", () => {
+    expect(nextZoomStop(100, 1)).toBe(110)
+    expect(nextZoomStop(100, -1)).toBe(90)
+  })
+
+  it("snaps an arbitrary (pinched) zoom onto the ladder", () => {
+    expect(nextZoomStop(137, 1)).toBe(150)
+    expect(nextZoomStop(137, -1)).toBe(125)
+  })
+
+  it("clamps at the ends", () => {
+    expect(nextZoomStop(400, 1)).toBe(400)
+    expect(nextZoomStop(10, -1)).toBe(10)
   })
 })

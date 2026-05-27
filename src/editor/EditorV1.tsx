@@ -128,8 +128,8 @@ export function EditorV1() {
     onSave,
     onUndo,
     onRedo,
-    onZoomIn: () => nudgeZoom(25),
-    onZoomOut: () => nudgeZoom(-25),
+    onZoomIn: () => nudgeZoom(1),
+    onZoomOut: () => nudgeZoom(-1),
     onZoomFit: fitView,
     onZoom100: zoom100,
   })
@@ -165,8 +165,8 @@ export function EditorV1() {
           onOpacity={(value) => dispatch({ type: "setOpacity", value })}
           onForeground={(color) => dispatch({ type: "setForeground", color })}
           onFillTolerance={(value) => dispatch({ type: "setFillTolerance", value })}
-          onZoomIn={() => nudgeZoom(25)}
-          onZoomOut={() => nudgeZoom(-25)}
+          onZoomIn={() => nudgeZoom(1)}
+          onZoomOut={() => nudgeZoom(-1)}
           onZoomFit={fitView}
           onToggleRight={() => dispatch({ type: "toggleRight" })}
           onExport={onExport}

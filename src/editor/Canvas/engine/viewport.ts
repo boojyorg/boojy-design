@@ -23,6 +23,26 @@ export const ZOOM_MAX = 400
 export const clampZoom = (z: number) => Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, z))
 
 /**
+ * Zoom presets the +/- buttons and keys step through — Chrome-like: finer near 100%,
+ * coarser at the extremes (a fixed linear step feels wrong at both ends). Pinch/scroll
+ * stays continuous; only the discrete controls snap to these rungs.
+ */
+export const ZOOM_STOPS = [
+  10, 25, 33, 50, 67, 75, 80, 90, 100, 110, 125, 150, 175, 200, 250, 300, 400,
+]
+
+/**
+ * The next preset strictly above (`dir` > 0) or below (`dir` < 0) the current `zoom`,
+ * clamped to the ends. The 0.5% epsilon means a zoom sitting *on* a rung steps to the
+ * next one (rather than snapping back to itself on float drift).
+ */
+export function nextZoomStop(zoom: number, dir: number): number {
+  const eps = 0.5
+  if (dir > 0) return ZOOM_STOPS.find((z) => z > zoom + eps) ?? ZOOM_MAX
+  return ZOOM_STOPS.filter((z) => z < zoom - eps).at(-1) ?? ZOOM_MIN
+}
+
+/**
  * Centre a `docW`×`docH` document in a `containerW`×`containerH` viewport at `zoom`%,
  * then offset by (`panX`, `panY`). pan defaults to 0 ⇒ the document is exactly centred
  * (the pre-pan behaviour). With these applied to the content layer, screen↔doc mapping

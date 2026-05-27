@@ -11,12 +11,17 @@ describe("viewportStore", () => {
     expect([vp().panX, vp().panY]).toEqual([13, -3])
   })
 
-  it("clamps zoom on nudge", () => {
+  it("steps zoom through presets, clamped at the ends", () => {
     vp().setContainerSize(800, 600)
-    vp().nudgeZoom(1000)
-    expect(vp().zoom).toBe(400)
-    vp().nudgeZoom(-1000)
-    expect(vp().zoom).toBe(10)
+    // From the 75% default, in → 80 → 90 → 100, then out → 90.
+    vp().nudgeZoom(1)
+    expect(vp().zoom).toBe(80)
+    vp().nudgeZoom(1)
+    expect(vp().zoom).toBe(90)
+    vp().nudgeZoom(1)
+    expect(vp().zoom).toBe(100)
+    vp().nudgeZoom(-1)
+    expect(vp().zoom).toBe(90)
   })
 
   it("zooms toward a cursor point, keeping it fixed", () => {
