@@ -33,6 +33,19 @@ describe("serializeDesign / parseDesign", () => {
     ])
   })
 
+  it("round-trips per-layer display offsets and skips layers at the origin", () => {
+    const offset = (id: string) => (id === "l2" ? { x: 40, y: -15 } : { x: 0, y: 0 })
+    const json = serializeDesign(snapshot, fakePixels("data:image/png;base64,AAAA"), SIZE, offset)
+    const parsed = parseDesign(json)
+    // Only the moved layer is recorded; the origin layer is omitted (→ defaults to 0 on open).
+    expect(parsed.offsets).toEqual([{ layerId: "l2", x: 40, y: -15 }])
+  })
+
+  it("parses a pre-offset file (no offset fields) with no offsets", () => {
+    const json = serializeDesign(snapshot, fakePixels(null), SIZE) // default getter → origin
+    expect(parseDesign(json).offsets).toEqual([])
+  })
+
   it("omits pixel entries for layers with no captured bitmap", () => {
     const json = serializeDesign(snapshot, fakePixels(null), SIZE)
     const parsed = parseDesign(json)

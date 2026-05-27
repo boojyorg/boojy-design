@@ -44,6 +44,12 @@ export interface CanvasStageHandle {
   captureLayerPixels: (layerId: string) => HTMLCanvasElement | null
   /** Queue a pixel snapshot to paint into a layer once its node next exists (after a sync). */
   stashPixelRestore: (layerId: string, canvas: HTMLCanvasElement) => void
+  /** A layer's non-destructive display offset (for save + duplicate). */
+  getLayerOffset: (layerId: string) => { x: number; y: number }
+  /** Set a layer's display offset (for open + duplicate). */
+  setLayerOffset: (layerId: string, offset: { x: number; y: number }) => void
+  /** Drop all stored offsets (on opening a new document). */
+  clearOffsets: () => void
 }
 
 export const CanvasStage = forwardRef<CanvasStageHandle, CanvasStageProps>(
@@ -82,6 +88,9 @@ export const CanvasStage = forwardRef<CanvasStageHandle, CanvasStageProps>(
         stashPixelRestore: (layerId, canvas) => {
           pendingPixelRestoresRef.current.push({ layerId, canvas })
         },
+        getLayerOffset: (layerId) => engineRef.current?.getLayerOffset(layerId) ?? { x: 0, y: 0 },
+        setLayerOffset: (layerId, offset) => engineRef.current?.setLayerOffset(layerId, offset),
+        clearOffsets: () => engineRef.current?.clearOffsets(),
       }),
       [importImage],
     )
@@ -115,6 +124,14 @@ export const CanvasStage = forwardRef<CanvasStageHandle, CanvasStageProps>(
           label: "stroke",
           undo: () => engineRef.current?.restorePixels(commit.layerId, commit.before),
           redo: () => engineRef.current?.restorePixels(commit.layerId, commit.after),
+        })
+      })
+      // A move is an offset change (no pixels) — undo/redo just replays the before/after offset.
+      engineRef.current?.setOnMoveCommitted((commit) => {
+        record({
+          label: "move",
+          undo: () => engineRef.current?.setLayerOffset(commit.layerId, commit.before),
+          redo: () => engineRef.current?.setLayerOffset(commit.layerId, commit.after),
         })
       })
     }, [record])
@@ -164,8 +181,43 @@ export const CanvasStage = forwardRef<CanvasStageHandle, CanvasStageProps>(
       engineRef.current?.setZoom(props.zoom)
     }, [props.zoom])
 
+    // Move tool: arrow keys nudge the active layer (1px; 10px with Shift), each press a
+    // single undoable step. Only attached while Move is active, so other tools' arrow
+    // behaviour is untouched; ignored while typing so the layer-rename field keeps caret keys.
+    useEffect(() => {
+      if (props.tool !== "select") return
+      const onArrow = (e: KeyboardEvent) => {
+        const t = e.target as HTMLElement | null
+        if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return
+        const step = e.shiftKey ? 10 : 1
+        let dx = 0
+        let dy = 0
+        switch (e.key) {
+          case "ArrowLeft":
+            dx = -step
+            break
+          case "ArrowRight":
+            dx = step
+            break
+          case "ArrowUp":
+            dy = -step
+            break
+          case "ArrowDown":
+            dy = step
+            break
+          default:
+            return
+        }
+        e.preventDefault()
+        engineRef.current?.nudgeActiveLayer(dx, dy)
+      }
+      window.addEventListener("keydown", onArrow)
+      return () => window.removeEventListener("keydown", onArrow)
+    }, [props.tool])
+
     const isPaintTool = props.tool === "brush" || props.tool === "eraser" || props.tool === "shape"
     const showCrosshair = isPaintTool || props.tool === "eyedropper" || props.tool === "fill"
+    const cursor = props.tool === "select" ? "move" : showCrosshair ? "crosshair" : "default"
 
     return (
       <div
@@ -178,7 +230,7 @@ export const CanvasStage = forwardRef<CanvasStageHandle, CanvasStageProps>(
         <div
           ref={hostRef}
           className="absolute inset-0"
-          style={{ cursor: showCrosshair ? "crosshair" : "default", touchAction: "none" }}
+          style={{ cursor, touchAction: "none" }}
           onPointerDown={(e) => {
             if (props.tool === "eyedropper") {
               const hex = engineRef.current?.sampleColorAt(e.clientX, e.clientY)

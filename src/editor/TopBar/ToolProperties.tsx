@@ -156,7 +156,7 @@ export function ToolProperties({
 
   const hint =
     tool === "select"
-      ? "Drag to move · click a layer to select"
+      ? "Drag a layer to move it · arrow keys nudge"
       : tool === "hand"
         ? "Drag to pan · scroll to zoom"
         : tool === "eyedropper"

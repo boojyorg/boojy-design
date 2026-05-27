@@ -22,6 +22,8 @@ const ids = () => useDocumentStore.getState().layers.map((l) => l.id)
 const fakePort = (canvas: HTMLCanvasElement | null): PixelPort => ({
   captureLayerPixels: vi.fn(() => canvas),
   stashPixelRestore: vi.fn(),
+  getLayerOffset: vi.fn(() => ({ x: 0, y: 0 })),
+  setLayerOffset: vi.fn(),
 })
 
 describe("runUndoable", () => {
@@ -91,5 +93,15 @@ describe("runDuplicateLayer", () => {
     cmd.redo()
     expect(ids()).toEqual(["l4", "dup1", "l3", "l2", "l1"])
     expect(port.stashPixelRestore).toHaveBeenCalledWith("dup1", captured)
+  })
+
+  it("copies the source layer's display offset onto the duplicate (lands in place)", () => {
+    const { record } = recorder()
+    const port = fakePort(null)
+    vi.mocked(port.getLayerOffset).mockReturnValue({ x: 12, y: -4 })
+
+    runDuplicateLayer("l3", "dup1", port, record)
+    expect(port.getLayerOffset).toHaveBeenCalledWith("l3")
+    expect(port.setLayerOffset).toHaveBeenCalledWith("dup1", { x: 12, y: -4 })
   })
 })

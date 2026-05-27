@@ -24,6 +24,7 @@ function flatten(
   layers: Layer[],
   canvases: Record<string, Canvas>,
   background: "white" | "transparent",
+  offsets: Record<string, { x: number; y: number }> = {},
 ): Uint8ClampedArray {
   const out = createCanvas(W, H)
   const ctx = out.getContext("2d")
@@ -32,6 +33,7 @@ function flatten(
     layers,
     (id) => canvases[id] as unknown as CanvasImageSource | undefined,
     { background, backgroundColor: "#ffffff", width: W, height: H },
+    (id) => offsets[id] ?? { x: 0, y: 0 },
   )
   return ctx.getImageData(0, 0, W, H).data as unknown as Uint8ClampedArray
 }
@@ -60,6 +62,17 @@ describe("flattenLayers (real canvas)", () => {
     expect(d[1]).toBeLessThan(136)
     expect(d[2]).toBeGreaterThan(120)
     expect(d[2]).toBeLessThan(136)
+  })
+
+  it("composites a layer at its display offset and clips content past the edge", () => {
+    const d = flatten([layer("a")], { a: solid("#ff0000") }, "transparent", { a: { x: 1, y: 0 } })
+    const px = (x: number, y: number) => {
+      const i = (y * W + x) * 4
+      return [d[i], d[i + 1], d[i + 2], d[i + 3]]
+    }
+    expect(px(0, 0)).toEqual([0, 0, 0, 0]) // vacated column — the layer shifted right
+    expect(px(1, 0)).toEqual([255, 0, 0, 255]) // red, one px right
+    expect(px(3, 0)).toEqual([255, 0, 0, 255]) // still covered; the rightmost source column clipped
   })
 
   it("paints top-of-stack (index 0) last", () => {
