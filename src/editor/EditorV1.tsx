@@ -13,6 +13,7 @@ import {
 } from "@/editor/state/commands"
 import { useDocumentStore } from "@/editor/state/documentStore"
 import { newLayerId } from "@/editor/state/ids"
+import { useThumbnailStore } from "@/editor/state/thumbnailStore"
 import { useUndoStore } from "@/editor/state/undoStore"
 import { useEditorState } from "@/editor/state/useEditorState"
 import { TopBar } from "@/editor/TopBar/TopBar"
@@ -94,9 +95,10 @@ export function EditorV1() {
             canvas: await decodeDataUrlToCanvas(p.dataUrl),
           })),
         )
-        // Drop the previous document's offsets, then stash pixels + offsets for the new layers;
-        // the layers effect's sync creates the nodes and positions them from the offset map.
+        // Drop the previous document's offsets + thumbnails, then stash pixels + offsets for the
+        // new layers; the layers effect's sync creates the nodes (pixel restore repaints thumbs).
         stageRef.current?.clearOffsets()
+        useThumbnailStore.getState().clearThumbnails()
         for (const { layerId, canvas } of decoded)
           stageRef.current?.stashPixelRestore(layerId, canvas)
         for (const o of parsed.offsets)

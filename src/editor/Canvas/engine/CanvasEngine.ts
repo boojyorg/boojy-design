@@ -12,6 +12,7 @@ import { floodFill } from "@/editor/Canvas/engine/fill"
 import { flattenLayers } from "@/editor/Canvas/engine/flatten"
 import { moveOffset, type Offset } from "@/editor/Canvas/engine/move"
 import { drawEllipse, drawRect, normalizeRect } from "@/editor/Canvas/engine/shape"
+import { contentBounds } from "@/editor/Canvas/engine/thumbnail"
 import {
   type BrushParams,
   DOC_HEIGHT,
@@ -104,6 +105,10 @@ export class CanvasEngine {
   private moveStart: Point | null = null
   private moveStartOffset: Offset = { x: 0, y: 0 }
   private onMoveCommitted?: (commit: MoveCommit) => void
+  // Fired after any op that changes a layer's *buffer* pixels (stroke/shape/fill/import/restore) so
+  // React can refresh that layer's thumbnail. NOT fired on move — a move only shifts the display
+  // offset, and thumbnails show buffer content, so the pixels are unchanged.
+  private onLayerPixelsChanged?: (layerId: string) => void
   // Latest Shift state for the shape constraint — updated by pointer moves *and* by
   // raw Shift key events, so the preview tracks Shift even while the pointer is still.
   private shiftDown = false
@@ -388,6 +393,7 @@ export class CanvasEngine {
         before: this.cloneCanvas(this.snapshotCanvas),
         after: this.cloneCanvas(target.canvas),
       })
+      this.onLayerPixelsChanged?.(this.strokeLayerId)
     }
 
     this.target = null
@@ -407,11 +413,17 @@ export class CanvasEngine {
     this.onMoveCommitted = cb
   }
 
+  /** Subscribe to per-layer pixel changes (the chrome refreshes that layer's thumbnail). */
+  setOnLayerPixelsChanged(cb: (layerId: string) => void) {
+    this.onLayerPixelsChanged = cb
+  }
+
   /** Overwrite a layer's pixels with a snapshot (undo/redo restore). Public so the
    *  timeline's stroke and delete commands can replay pixel state. No-op if the layer
    *  has no node (e.g. before its delete-undo has recreated it). */
   restorePixels(layerId: string, snapshot: HTMLCanvasElement) {
     this.restore(layerId, snapshot)
+    this.onLayerPixelsChanged?.(layerId)
   }
 
   /** Clone a layer's current pixels into a detached canvas, or null if it has no node.
@@ -420,6 +432,49 @@ export class CanvasEngine {
     const node = this.nodes.get(layerId)
     if (!node) return null
     return this.cloneCanvas(node.canvas)
+  }
+
+  /** A PNG data URL preview for the Layers panel — the layer's **content** (its non-transparent
+   *  bounding box) scaled to fill the thumbnail, aspect-preserved. Null if the layer has no node,
+   *  no 2D context, or is blank (so a blank/erased layer shows an empty box). Ignores the layer's
+   *  move-offset — the preview is about *what's* on the layer, not where it sits on the page. */
+  getLayerThumbnail(layerId: string, w: number, h: number): string | null {
+    const node = this.nodes.get(layerId)
+    if (!node) return null
+    const bounds = contentBounds(
+      node.ctx.getImageData(0, 0, DOC_WIDTH, DOC_HEIGHT).data,
+      DOC_WIDTH,
+      DOC_HEIGHT,
+    )
+    if (!bounds) return null // blank layer → no thumbnail
+
+    const thumb = document.createElement("canvas")
+    thumb.width = w
+    thumb.height = h
+    let ctx: CanvasRenderingContext2D | null = null
+    try {
+      ctx = thumb.getContext("2d")
+    } catch {
+      ctx = null
+    }
+    if (!ctx) return null
+
+    // Fit the content box into the thumbnail (upscaling allowed, so a small mark reads large).
+    const scale = Math.min(w / bounds.w, h / bounds.h)
+    const dw = bounds.w * scale
+    const dh = bounds.h * scale
+    ctx.drawImage(
+      node.canvas,
+      bounds.x,
+      bounds.y,
+      bounds.w,
+      bounds.h,
+      (w - dw) / 2,
+      (h - dh) / 2,
+      dw,
+      dh,
+    )
+    return thumb.toDataURL("image/png")
   }
 
   /**
@@ -527,6 +582,7 @@ export class CanvasEngine {
       before,
       after: this.cloneCanvas(target.canvas),
     })
+    this.onLayerPixelsChanged?.(this.activeLayerId)
   }
 
   /** Draw a decoded image into the active layer, fit-centered. Pixels only — no history
@@ -538,6 +594,7 @@ export class CanvasEngine {
     node.ctx.globalAlpha = 1
     drawImageContain(node.ctx, source, srcW, srcH, DOC_WIDTH, DOC_HEIGHT)
     this.layer?.batchDraw()
+    this.onLayerPixelsChanged?.(this.activeLayerId)
   }
 
   // ── internals ──────────────────────────────────────────────────────────────

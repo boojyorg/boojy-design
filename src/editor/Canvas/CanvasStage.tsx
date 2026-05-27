@@ -1,5 +1,6 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef } from "react"
 import { CanvasEngine } from "@/editor/Canvas/engine/CanvasEngine"
+import { useThumbnailStore } from "@/editor/state/thumbnailStore"
 import { useUndoStore } from "@/editor/state/undoStore"
 import type { Layer, ToolId, VectorKind } from "@/editor/types"
 import { toLayerName } from "@/lib/filename"
@@ -57,6 +58,8 @@ export const CanvasStage = forwardRef<CanvasStageHandle, CanvasStageProps>(
     const hostRef = useRef<HTMLDivElement>(null)
     const engineRef = useRef<CanvasEngine | null>(null)
     const record = useUndoStore((s) => s.record)
+    const setThumbnail = useThumbnailStore((s) => s.setThumbnail)
+    const removeThumbnail = useThumbnailStore((s) => s.removeThumbnail)
     // A decoded image waiting for its layer's node to exist (drawn in the layers effect).
     const pendingImageRef = useRef<{ source: CanvasImageSource; w: number; h: number } | null>(null)
     // Pixel snapshots waiting for their layer's node to exist, drained after the next sync.
@@ -134,7 +137,14 @@ export const CanvasStage = forwardRef<CanvasStageHandle, CanvasStageProps>(
           redo: () => engineRef.current?.setLayerOffset(commit.layerId, commit.after),
         })
       })
-    }, [record])
+      // Refresh the changed layer's panel thumbnail (fires on stroke/shape/fill/import/restore).
+      // A blank layer yields no thumbnail → drop the entry so the row shows an empty box.
+      engineRef.current?.setOnLayerPixelsChanged((layerId) => {
+        const url = engineRef.current?.getLayerThumbnail(layerId, 72, 56)
+        if (url) setThumbnail(layerId, url)
+        else removeThumbnail(layerId)
+      })
+    }, [record, setThumbnail, removeThumbnail])
 
     useEffect(() => {
       engineRef.current?.setBrush({
