@@ -1,4 +1,15 @@
 import "@testing-library/jest-dom/vitest"
+import { beforeEach } from "vitest"
+import { initialDocumentState, useDocumentStore } from "@/editor/state/documentStore"
+import { useUndoStore } from "@/editor/state/undoStore"
+
+// The document and undo stores are module singletons, so their state would otherwise
+// leak between tests (the old per-render useReducer reset for free). Restore fresh
+// document state and clear the undo timeline before every dom test to keep them isolated.
+beforeEach(() => {
+  useDocumentStore.setState(initialDocumentState())
+  useUndoStore.getState().clear()
+})
 
 // jsdom lacks several browser APIs that Radix primitives depend on.
 class ResizeObserverStub {

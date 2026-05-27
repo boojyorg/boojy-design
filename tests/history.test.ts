@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { HistoryStack } from "@/editor/Canvas/engine/history"
+import { HistoryStack } from "@/editor/state/history"
 
 describe("HistoryStack", () => {
   it("starts empty — nothing to undo or redo", () => {

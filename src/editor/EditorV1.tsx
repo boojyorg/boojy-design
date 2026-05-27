@@ -1,9 +1,17 @@
-import { type ChangeEvent, useCallback, useRef, useState } from "react"
+import { type ChangeEvent, useCallback, useMemo, useRef } from "react"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { CanvasStage, type CanvasStageHandle } from "@/editor/Canvas/CanvasStage"
 import { LeftRail } from "@/editor/LeftRail/LeftRail"
 import { RightSidebar } from "@/editor/RightSidebar/RightSidebar"
+import {
+  type PixelPort,
+  runDeleteLayer,
+  runDuplicateLayer,
+  runUndoable,
+} from "@/editor/state/commands"
+import { useDocumentStore } from "@/editor/state/documentStore"
 import { newLayerId } from "@/editor/state/ids"
+import { useUndoStore } from "@/editor/state/undoStore"
 import { useEditorState } from "@/editor/state/useEditorState"
 import { TopBar } from "@/editor/TopBar/TopBar"
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts"
@@ -11,12 +19,33 @@ import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts"
 /** V1 "Classic" — the chosen direction. Three-region layout, mock-interactive. */
 export function EditorV1() {
   const [state, dispatch] = useEditorState()
+  const layers = useDocumentStore((s) => s.layers)
+  const activeLayerId = useDocumentStore((s) => s.activeLayerId)
+  const selectLayer = useDocumentStore((s) => s.selectLayer)
+  const toggleLayer = useDocumentStore((s) => s.toggleLayer)
+  const addLayer = useDocumentStore((s) => s.addLayer)
+  const renameLayer = useDocumentStore((s) => s.renameLayer)
+  const moveLayer = useDocumentStore((s) => s.moveLayer)
+  const canUndo = useUndoStore((s) => s.canUndo)
+  const canRedo = useUndoStore((s) => s.canRedo)
+  const record = useUndoStore((s) => s.record)
+  const undo = useUndoStore((s) => s.undo)
+  const redo = useUndoStore((s) => s.redo)
   const stageRef = useRef<CanvasStageHandle>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const [history, setHistory] = useState({ canUndo: false, canRedo: false })
+
+  // The engine's pixel ops the timeline needs, behind the CanvasStage seam.
+  const pixelPort = useMemo<PixelPort>(
+    () => ({
+      captureLayerPixels: (id) => stageRef.current?.captureLayerPixels(id) ?? null,
+      stashPixelRestore: (id, canvas) => stageRef.current?.stashPixelRestore(id, canvas),
+    }),
+    [],
+  )
+
   const onExport = useCallback(() => stageRef.current?.exportPNG(), [])
-  const onUndo = useCallback(() => stageRef.current?.undo(), [])
-  const onRedo = useCallback(() => stageRef.current?.redo(), [])
+  const onUndo = useCallback(() => undo(), [undo])
+  const onRedo = useCallback(() => redo(), [redo])
   const onOpen = useCallback(() => fileInputRef.current?.click(), [])
   const onImportFile = useCallback((e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -24,14 +53,8 @@ export function EditorV1() {
     e.target.value = "" // let the same file be re-imported
   }, [])
   const onDuplicateLayer = useCallback(
-    (id: string) => {
-      // Generate the new id here so the engine can copy pixels into it after the reducer
-      // adds the layer (stash first, then dispatch — same ordering as image import).
-      const dupId = newLayerId()
-      stageRef.current?.stashDuplicate(id, dupId)
-      dispatch({ type: "duplicateLayer", id, newId: dupId })
-    },
-    [dispatch],
+    (id: string) => runDuplicateLayer(id, newLayerId(), pixelPort, record),
+    [pixelPort, record],
   )
   useKeyboardShortcuts(dispatch, { onExport, onUndo, onRedo, onOpen })
 
@@ -64,8 +87,8 @@ export function EditorV1() {
           onOpen={onOpen}
           onUndo={onUndo}
           onRedo={onRedo}
-          canUndo={history.canUndo}
-          canRedo={history.canRedo}
+          canUndo={canUndo}
+          canRedo={canRedo}
         />
 
         <div className="flex min-h-0 flex-1">
@@ -83,22 +106,25 @@ export function EditorV1() {
             opacity={state.opacity}
             foreground={state.foreground}
             zoom={state.zoom}
-            layers={state.layers}
-            activeLayerId={state.activeLayerId}
-            onHistoryChange={setHistory}
-            onRequestImageLayer={(name) => dispatch({ type: "addLayer", name, layerType: "image" })}
+            layers={layers}
+            activeLayerId={activeLayerId}
+            onRequestImageLayer={(name) => addLayer(name, "image")}
           />
           <RightSidebar
             collapsed={state.rightCollapsed}
-            layers={state.layers}
-            activeLayerId={state.activeLayerId}
-            onSelectLayer={(id) => dispatch({ type: "selectLayer", id })}
-            onToggleLayer={(id) => dispatch({ type: "toggleLayer", id })}
-            onAddLayer={() => dispatch({ type: "addLayer" })}
-            onDeleteLayer={() => dispatch({ type: "deleteActiveLayer" })}
-            onRenameLayer={(id, name) => dispatch({ type: "renameLayer", id, name })}
+            layers={layers}
+            activeLayerId={activeLayerId}
+            onSelectLayer={(id) => selectLayer(id)}
+            onToggleLayer={(id) => runUndoable("toggle visibility", () => toggleLayer(id), record)}
+            onAddLayer={() => runUndoable("add layer", () => addLayer(), record)}
+            onDeleteLayer={() => runDeleteLayer(pixelPort, record)}
+            onRenameLayer={(id, name) =>
+              runUndoable("rename layer", () => renameLayer(id, name), record)
+            }
             onDuplicateLayer={onDuplicateLayer}
-            onMoveLayer={(id, toIndex) => dispatch({ type: "moveLayer", id, toIndex })}
+            onMoveLayer={(id, toIndex) =>
+              runUndoable("reorder layer", () => moveLayer(id, toIndex), record)
+            }
           />
         </div>
       </div>

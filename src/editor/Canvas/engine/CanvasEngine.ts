@@ -8,7 +8,6 @@ import {
 } from "@/editor/Canvas/engine/brush"
 import { drawImageContain } from "@/editor/Canvas/engine/draw"
 import { flattenLayers } from "@/editor/Canvas/engine/flatten"
-import { HistoryStack } from "@/editor/Canvas/engine/history"
 import {
   type BrushParams,
   DOC_HEIGHT,
@@ -28,8 +27,9 @@ interface RasterNode {
   image: Konva.Image
 }
 
-/** One undoable stroke: the affected layer's full pixels before and after the stroke. */
-interface HistoryEntry {
+/** A committed stroke handed up to the unified timeline: the affected layer's full
+ *  pixels before and after the stroke. The engine no longer owns undo ordering. */
+export interface StrokeCommit {
   layerId: string
   before: HTMLCanvasElement
   after: HTMLCanvasElement
@@ -65,10 +65,10 @@ export class CanvasEngine {
   private zoom = 100
   // Last layer list handed to syncLayers — authoritative order/visibility/opacity for export.
   private layers: Layer[] = []
-  // Undo/redo: full-layer before/after snapshots per committed stroke (strokes only).
-  // Dirty-rect capture would shrink each entry but adds hot-path bounds-tracking — deferred.
-  private readonly history = new HistoryStack<HistoryEntry>()
-  private onHistoryChange?: (s: { canUndo: boolean; canRedo: boolean }) => void
+  // The engine captures full-layer before/after snapshots per stroke and emits them; the
+  // unified undo timeline (undoStore) owns ordering. Dirty-rect capture would shrink each
+  // snapshot but adds hot-path bounds-tracking — deferred.
+  private onStrokeCommitted?: (commit: StrokeCommit) => void
   private strokeLayerId = ""
 
   // In-progress stroke. `strokeCanvas` accumulates stamps at full alpha; `snapshot`
@@ -126,7 +126,6 @@ export class CanvasEngine {
     this.page = null
     this.container = null
     this.nodes.clear()
-    this.history.clear()
     this.strokeCanvas = null
     this.strokeCtx = null
     this.snapshotCanvas = null
@@ -166,17 +165,15 @@ export class CanvasEngine {
       node.image.opacity(layer.opacity / 100)
     }
 
-    let pruned = false
     for (const [id, node] of this.nodes) {
       if (!seen.has(id)) {
         node.image.destroy()
         this.nodes.delete(id)
-        // Strokes-only undo can't resurrect a deleted layer — drop its history.
-        this.history.prune((e) => e.layerId === id)
-        pruned = true
+        // No history pruning: the unified timeline is linear, so a deleted layer's
+        // older stroke commands can only be reached after its delete is undone — which
+        // resurrects the node first (delete-undo restores the layer + its pixels).
       }
     }
-    if (pruned) this.notifyHistory()
 
     // Restack: bottom-of-stack (end of array) up to top-of-stack (index 0), page beneath.
     for (const layer of [...layers].reverse()) {
@@ -227,14 +224,14 @@ export class CanvasEngine {
     if (!target) return
     this.render() // bake the final state into the layer buffer
 
-    // Record the stroke: before = pre-stroke snapshot, after = the baked result.
+    // Emit the stroke for the unified timeline: before = pre-stroke snapshot,
+    // after = the baked result. undoStore decides where it sits in history.
     if (this.snapshotCanvas) {
-      this.history.push({
+      this.onStrokeCommitted?.({
         layerId: this.strokeLayerId,
         before: this.cloneCanvas(this.snapshotCanvas),
         after: this.cloneCanvas(target.canvas),
       })
-      this.notifyHistory()
     }
 
     this.target = null
@@ -242,26 +239,24 @@ export class CanvasEngine {
     this.carryOver = 0
   }
 
-  /** Restore the layer to the previous stroke's "before" pixels. */
-  undo() {
-    const entry = this.history.undo()
-    if (!entry) return
-    this.restore(entry.layerId, entry.before)
-    this.notifyHistory()
+  /** Subscribe to committed strokes (the timeline records each as an undoable command). */
+  setOnStrokeCommitted(cb: (commit: StrokeCommit) => void) {
+    this.onStrokeCommitted = cb
   }
 
-  /** Re-apply the undone stroke's "after" pixels. */
-  redo() {
-    const entry = this.history.redo()
-    if (!entry) return
-    this.restore(entry.layerId, entry.after)
-    this.notifyHistory()
+  /** Overwrite a layer's pixels with a snapshot (undo/redo restore). Public so the
+   *  timeline's stroke and delete commands can replay pixel state. No-op if the layer
+   *  has no node (e.g. before its delete-undo has recreated it). */
+  restorePixels(layerId: string, snapshot: HTMLCanvasElement) {
+    this.restore(layerId, snapshot)
   }
 
-  /** Subscribe to undo/redo availability; fires immediately with the current state. */
-  setOnHistoryChange(cb: (s: { canUndo: boolean; canRedo: boolean }) => void) {
-    this.onHistoryChange = cb
-    this.notifyHistory()
+  /** Clone a layer's current pixels into a detached canvas, or null if it has no node.
+   *  Used to snapshot a layer before a destructive op (delete/duplicate). */
+  captureLayerPixels(layerId: string): HTMLCanvasElement | null {
+    const node = this.nodes.get(layerId)
+    if (!node) return null
+    return this.cloneCanvas(node.canvas)
   }
 
   /**
@@ -306,23 +301,7 @@ export class CanvasEngine {
     this.layer?.batchDraw()
   }
 
-  /** Copy one layer's pixels into another (layer duplicate). Pixels only — no history. */
-  duplicateLayerPixels(fromId: string, toId: string) {
-    const from = this.nodes.get(fromId)
-    const to = this.nodes.get(toId)
-    if (!from || !to) return
-    to.ctx.globalCompositeOperation = "source-over"
-    to.ctx.globalAlpha = 1
-    to.ctx.clearRect(0, 0, DOC_WIDTH, DOC_HEIGHT)
-    to.ctx.drawImage(from.canvas, 0, 0)
-    this.layer?.batchDraw()
-  }
-
   // ── internals ──────────────────────────────────────────────────────────────
-
-  private notifyHistory() {
-    this.onHistoryChange?.({ canUndo: this.history.canUndo(), canRedo: this.history.canRedo() })
-  }
 
   /** Overwrite a layer's pixels with a snapshot (undo/redo restore). */
   private restore(layerId: string, snapshot: HTMLCanvasElement) {
