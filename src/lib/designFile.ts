@@ -1,3 +1,4 @@
+import { IDENTITY, type Transform } from "@/editor/Canvas/engine/transform"
 import type { DocumentSnapshot } from "@/editor/state/documentStore"
 import type { Layer, LayerType, VectorKind } from "@/editor/types"
 
@@ -20,7 +21,9 @@ interface SerializedLayer {
   kind?: VectorKind
   /** data: URL PNG of the layer's pixels, or null if it had none (or couldn't be read). */
   pixels: string | null
-  /** Non-destructive display offset; omitted when at origin. Absent in pre-offset files (→ 0). */
+  /** Non-destructive transform; omitted when identity. */
+  transform?: Transform
+  /** Legacy translate-only offset (pre-transform files) — read as `{…, scale:1, rotation:0}`. */
   offsetX?: number
   offsetY?: number
 }
@@ -34,24 +37,38 @@ interface DesignFile {
   layers: SerializedLayer[]
 }
 
-/** A parsed file split into the document slice, per-layer pixel data, and per-layer offsets. */
+/** A parsed file split into the document slice, per-layer pixel data, and per-layer transforms. */
 export interface ParsedDesign {
   snapshot: DocumentSnapshot
   pixels: { layerId: string; dataUrl: string }[]
-  offsets: { layerId: string; x: number; y: number }[]
+  transforms: { layerId: string; transform: Transform }[]
+}
+
+const isIdentity = (t: Transform) => t.x === 0 && t.y === 0 && t.scale === 1 && t.rotation === 0
+
+/** Coerce an unknown to a Transform, or null if it isn't one (validates on open). */
+function asTransform(v: unknown): Transform | null {
+  if (typeof v !== "object" || v === null) return null
+  const t = v as Record<string, unknown>
+  return typeof t.x === "number" &&
+    typeof t.y === "number" &&
+    typeof t.scale === "number" &&
+    typeof t.rotation === "number"
+    ? { x: t.x, y: t.y, scale: t.scale, rotation: t.rotation }
+    : null
 }
 
 /** Serialise the current document to a `.design` JSON string. `getPixels` reads a layer's
- *  pixels from the engine (null under jsdom / for a layer with no node); `getOffset` reads
- *  its non-destructive display offset (defaults to origin). */
+ *  pixels from the engine (null under jsdom / for a layer with no node); `getTransform` reads
+ *  its non-destructive transform (defaults to identity). */
 export function serializeDesign(
   snapshot: DocumentSnapshot,
   getPixels: (layerId: string) => HTMLCanvasElement | null,
   size: { width: number; height: number },
-  getOffset: (layerId: string) => { x: number; y: number } = () => ({ x: 0, y: 0 }),
+  getTransform: (layerId: string) => Transform = () => IDENTITY,
 ): string {
   const layers: SerializedLayer[] = snapshot.layers.map((l) => {
-    const off = getOffset(l.id)
+    const t = getTransform(l.id)
     return {
       id: l.id,
       name: l.name,
@@ -59,7 +76,7 @@ export function serializeDesign(
       visible: l.visible,
       opacity: l.opacity,
       ...(l.kind ? { kind: l.kind } : {}),
-      ...(off.x || off.y ? { offsetX: off.x, offsetY: off.y } : {}),
+      ...(isIdentity(t) ? {} : { transform: t }),
       pixels: getPixels(l.id)?.toDataURL("image/png") ?? null,
     }
   })
@@ -91,17 +108,22 @@ export function parseDesign(json: string): ParsedDesign {
   const pixels = data.layers
     .filter((l): l is SerializedLayer & { pixels: string } => typeof l.pixels === "string")
     .map((l) => ({ layerId: l.id, dataUrl: l.pixels }))
-  const offsets = data.layers
-    .filter(
-      (l): l is SerializedLayer & { offsetX: number; offsetY: number } =>
-        typeof l.offsetX === "number" && typeof l.offsetY === "number",
-    )
-    .map((l) => ({ layerId: l.id, x: l.offsetX, y: l.offsetY }))
+  const transforms = data.layers
+    .map((l) => {
+      const t = asTransform(l.transform)
+      if (t) return { layerId: l.id, transform: t }
+      // Legacy translate-only offset → a transform with unit scale / no rotation.
+      if (typeof l.offsetX === "number" && typeof l.offsetY === "number") {
+        return { layerId: l.id, transform: { x: l.offsetX, y: l.offsetY, scale: 1, rotation: 0 } }
+      }
+      return null
+    })
+    .filter((x): x is { layerId: string; transform: Transform } => x !== null)
 
   return {
     snapshot: { layers, activeLayerId: data.activeLayerId, nextLayerNum: data.nextLayerNum },
     pixels,
-    offsets,
+    transforms,
   }
 }
 

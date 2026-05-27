@@ -10,9 +10,18 @@ import { hexToRgb, rgbaToHex } from "@/editor/Canvas/engine/color"
 import { drawImageContain } from "@/editor/Canvas/engine/draw"
 import { floodFill } from "@/editor/Canvas/engine/fill"
 import { flattenLayers } from "@/editor/Canvas/engine/flatten"
-import { moveOffset, type Offset } from "@/editor/Canvas/engine/move"
 import { drawEllipse, drawRect, normalizeRect } from "@/editor/Canvas/engine/shape"
-import { contentBounds } from "@/editor/Canvas/engine/thumbnail"
+import { type Bounds, contentBounds } from "@/editor/Canvas/engine/thumbnail"
+import {
+  apply,
+  boxCorners,
+  IDENTITY,
+  invert,
+  rotateAbout,
+  scaleAbout,
+  type Transform,
+  translateBy,
+} from "@/editor/Canvas/engine/transform"
 import {
   type BrushParams,
   DOC_HEIGHT,
@@ -40,13 +49,19 @@ export interface StrokeCommit {
   after: HTMLCanvasElement
 }
 
-/** A committed move handed up to the timeline: a layer's display offset before and after.
- *  Cheap (no pixel clone) — the move is non-destructive, so only the offset changes. */
+/** A committed transform handed up to the timeline: a layer's transform before and after.
+ *  Cheap (no pixel clone) — move/scale/rotate are non-destructive, so only the transform changes. */
 export interface MoveCommit {
   layerId: string
-  before: Offset
-  after: Offset
+  before: Transform
+  after: Transform
 }
+
+/** Which free-transform gesture a Move drag is performing, plus its fixed pivot in doc space. */
+type Gesture =
+  | { kind: "move" }
+  | { kind: "scale"; anchor: { x: number; y: number } }
+  | { kind: "rotate"; centre: { x: number; y: number } }
 
 const DEFAULT_BRUSH: BrushParams = {
   tool: "brush",
@@ -55,6 +70,13 @@ const DEFAULT_BRUSH: BrushParams = {
   opacity: 100,
   hardness: 80,
 }
+
+// Selection-overlay constants, in *screen* pixels. The accent is hardcoded because Konva draws
+// to canvas and can't use the Tailwind `--color-accent` token; keep it in sync with the theme.
+const SELECT_ACCENT = "#E89940"
+const HANDLE_SIZE = 9
+const HANDLE_HIT = 11
+const ROTATE_GRIP_DIST = 22
 
 /**
  * The imperative canvas engine — lives behind the CanvasStage seam. Owns the Konva
@@ -97,14 +119,21 @@ export class CanvasEngine {
   private carryOver = 0
   // Shape tool: the drag origin in buffer-local space. Non-null only mid shape-drag.
   private shapeStart: Point | null = null
-  // Per-layer non-destructive display offset (where each buffer is drawn, in doc pixels). Lives
-  // here in the engine — NOT on the thin Layer model — so a move never touches pixels. Entries
-  // persist past a node's destruction so undo-delete restores position (syncLayers re-applies).
-  private readonly offsets = new Map<string, Offset>()
-  // Active move-drag: the doc-space point where it began and the layer's offset at that moment.
+  // Per-layer non-destructive transform (move + uniform scale + rotation, in doc space). Lives
+  // here in the engine — NOT on the thin Layer model — so it never touches pixels. Entries persist
+  // past a node's destruction so undo-delete restores the transform (syncLayers re-applies).
+  private readonly transforms = new Map<string, Transform>()
+  // Active Move drag: the gesture, the doc-space point where it began, and the layer's transform
+  // at that moment (gestures are computed from this start so re-dragging never compounds).
+  private gesture: Gesture | null = null
   private moveStart: Point | null = null
-  private moveStartOffset: Offset = { x: 0, y: 0 }
+  private moveStartTransform: Transform = IDENTITY
   private onMoveCommitted?: (commit: MoveCommit) => void
+  // Screen-space overlay (selection box + handles), drawn while the Move tool is active.
+  private overlay: Konva.Layer | null = null
+  // Cached content bounds for the active layer (the getImageData scan is too costly to redo per
+  // pointer-move). Invalidated whenever the active layer's pixels change or the layer set changes.
+  private contentBoxCache: { layerId: string; box: Bounds | null } | null = null
   // Fired after any op that changes a layer's *buffer* pixels (stroke/shape/fill/import/restore) so
   // React can refresh that layer's thumbnail. NOT fired on move — a move only shifts the display
   // offset, and thumbnails show buffer content, so the pixels are unchanged.
@@ -146,6 +175,11 @@ export class CanvasEngine {
     })
     this.layer.add(this.page)
 
+    // Selection overlay: a screen-space layer (NOT view-scaled) so handles stay a constant size
+    // regardless of zoom. Visual only — pointer events still route through React → the engine.
+    this.overlay = new Konva.Layer({ listening: false })
+    this.stage.add(this.overlay)
+
     this.applyView()
 
     this.resizeObserver = new ResizeObserver(() => this.applyView())
@@ -159,6 +193,7 @@ export class CanvasEngine {
     this.stage = null
     this.layer = null
     this.page = null
+    this.overlay = null
     this.container = null
     this.nodes.clear()
     this.strokeCanvas = null
@@ -171,6 +206,7 @@ export class CanvasEngine {
 
   setBrush(brush: BrushParams) {
     this.brush = brush
+    this.renderOverlay() // show/hide the selection overlay as the active tool changes
   }
 
   setZoom(zoom: number) {
@@ -183,6 +219,7 @@ export class CanvasEngine {
   syncLayers(layers: Layer[], activeLayerId: string) {
     this.activeLayerId = activeLayerId
     this.layers = layers
+    this.invalidateContentBox() // active layer / pixels may have changed
     if (!this.layer) return
 
     const seen = new Set<string>()
@@ -198,9 +235,9 @@ export class CanvasEngine {
       }
       node.image.visible(layer.visible)
       node.image.opacity(layer.opacity / 100)
-      // Re-apply the layer's display offset (defaults to origin) — keeps a moved layer in place
-      // across reorders and restores its position when undo-delete resurrects the node.
-      node.image.position(this.offsets.get(layer.id) ?? { x: 0, y: 0 })
+      // Re-apply the layer's transform (defaults to identity) — keeps a moved/scaled/rotated layer
+      // in place across reorders and restores it when undo-delete resurrects the node.
+      this.applyTransformToNode(node, this.getLayerTransform(layer.id))
     }
 
     for (const [id, node] of this.nodes) {
@@ -219,6 +256,7 @@ export class CanvasEngine {
     }
     this.page?.moveToBottom()
     this.layer.batchDraw()
+    this.renderOverlay()
   }
 
   beginStroke(clientX: number, clientY: number) {
@@ -242,17 +280,17 @@ export class CanvasEngine {
     this.strokeLayerId = this.activeLayerId
 
     if (this.brush.tool === "select") {
-      // Move drags the whole layer: track the gesture in doc space against the layer's current
-      // offset. No buffers, no pixel writes — the layer's image just gets repositioned.
+      // Free transform: a handle under the press picks scale/rotate, otherwise the drag moves the
+      // layer. All non-destructive — only the layer's transform changes, never its pixels.
       this.moveStart = point
-      this.moveStartOffset = this.getLayerOffset(this.activeLayerId)
+      this.moveStartTransform = this.getLayerTransform(this.activeLayerId)
+      this.gesture = this.hitTestHandle(point) ?? { kind: "move" }
       return
     }
 
-    // Paint tools work in the layer's buffer-local space (buffer pixel == doc point − offset),
-    // so a stroke lands under the cursor on a moved layer without changing the rest of the path.
-    const off = this.getLayerOffset(this.activeLayerId)
-    const local = { x: point.x - off.x, y: point.y - off.y }
+    // Paint tools work in buffer-local space (the inverse of the layer's transform), so a stroke
+    // lands under the cursor on a moved/scaled/rotated layer without changing the rest of the path.
+    const local = invert(this.getLayerTransform(this.activeLayerId), point)
     this.snapshotCtx.clearRect(0, 0, DOC_WIDTH, DOC_HEIGHT)
     this.snapshotCtx.drawImage(target.canvas, 0, 0)
     this.strokeCtx.clearRect(0, 0, DOC_WIDTH, DOC_HEIGHT)
@@ -275,18 +313,29 @@ export class CanvasEngine {
     if (!point) return
 
     if (this.brush.tool === "select") {
-      // Repositions the layer's image to the new offset — pixels untouched.
-      if (!this.moveStart) return
-      this.setLayerOffset(
-        this.strokeLayerId,
-        moveOffset(this.moveStartOffset, this.moveStart, point),
-      )
+      // Apply the active gesture from the drag-start transform — pixels untouched.
+      if (!this.moveStart || !this.gesture) return
+      const start = this.moveStartTransform
+      let next: Transform
+      if (this.gesture.kind === "scale") {
+        next = scaleAbout(start, this.gesture.anchor, this.moveStart, point)
+      } else if (this.gesture.kind === "rotate") {
+        next = rotateAbout(
+          start,
+          this.gesture.centre,
+          this.moveStart,
+          point,
+          shiftKey ? 15 : undefined,
+        )
+      } else {
+        next = translateBy(start, point.x - this.moveStart.x, point.y - this.moveStart.y)
+      }
+      this.setLayerTransform(this.strokeLayerId, next)
       return
     }
 
     if (!this.lastPoint) return
-    const off = this.getLayerOffset(this.strokeLayerId)
-    const local = { x: point.x - off.x, y: point.y - off.y }
+    const local = invert(this.getLayerTransform(this.strokeLayerId), point)
 
     if (this.brush.tool === "shape") {
       this.shiftDown = shiftKey
@@ -325,33 +374,35 @@ export class CanvasEngine {
     this.render()
   }
 
-  /** A layer's non-destructive display offset (origin if it's never been moved). */
-  getLayerOffset(layerId: string): Offset {
-    return this.offsets.get(layerId) ?? { x: 0, y: 0 }
+  /** A layer's non-destructive transform (identity if it's never been transformed). */
+  getLayerTransform(layerId: string): Transform {
+    return this.transforms.get(layerId) ?? IDENTITY
   }
 
-  /** Set a layer's display offset: store it and reposition its Konva image. Public so the
-   *  timeline (move undo/redo), duplicate and document-open can replay positions. */
-  setLayerOffset(layerId: string, offset: Offset) {
-    this.offsets.set(layerId, offset)
-    this.nodes.get(layerId)?.image.position(offset)
+  /** Set a layer's transform: store it, apply it to the Konva image, refresh the overlay. Public so
+   *  the timeline (transform undo/redo), duplicate and document-open can replay it. */
+  setLayerTransform(layerId: string, transform: Transform) {
+    this.transforms.set(layerId, transform)
+    const node = this.nodes.get(layerId)
+    if (node) this.applyTransformToNode(node, transform)
     this.layer?.batchDraw()
+    this.renderOverlay()
   }
 
-  /** Drop all stored offsets (on opening a new document). */
-  clearOffsets() {
-    this.offsets.clear()
+  /** Drop all stored transforms (on opening a new document). */
+  clearTransforms() {
+    this.transforms.clear()
   }
 
-  /** Nudge the active layer by (dx, dy) and commit it as one undoable step (the arrow-key
-   *  path). Non-destructive — adjusts the offset; no-op on a hidden/missing layer. */
+  /** Nudge the active layer by (dx, dy) doc px and commit one undoable step (arrow-key path).
+   *  Non-destructive — translates the transform; no-op on a hidden/missing layer. */
   nudgeActiveLayer(dx: number, dy: number) {
     if (!this.stage || (dx === 0 && dy === 0)) return
     const node = this.nodes.get(this.activeLayerId)
     if (!node?.image.visible()) return
-    const before = this.getLayerOffset(this.activeLayerId)
-    const after = { x: before.x + dx, y: before.y + dy }
-    this.setLayerOffset(this.activeLayerId, after)
+    const before = this.getLayerTransform(this.activeLayerId)
+    const after = translateBy(before, dx, dy)
+    this.setLayerTransform(this.activeLayerId, after)
     this.onMoveCommitted?.({ layerId: this.activeLayerId, before, after })
   }
 
@@ -360,15 +411,21 @@ export class CanvasEngine {
     if (!target) return
 
     if (this.brush.tool === "select") {
-      // The layer's image is already at its new offset. Commit only a real move; a click with
-      // no drag (or a drag returned to origin) leaves nothing on the timeline.
-      const before = this.moveStartOffset
-      const after = this.getLayerOffset(this.strokeLayerId)
-      if (this.moveStart && (after.x !== before.x || after.y !== before.y)) {
+      // The image is already at its new transform. Commit only a real change; a click with no
+      // drag (or a drag returned to start) leaves nothing on the timeline.
+      const before = this.moveStartTransform
+      const after = this.getLayerTransform(this.strokeLayerId)
+      const changed =
+        after.x !== before.x ||
+        after.y !== before.y ||
+        after.scale !== before.scale ||
+        after.rotation !== before.rotation
+      if (this.moveStart && changed) {
         this.onMoveCommitted?.({ layerId: this.strokeLayerId, before, after })
       }
       this.target = null
       this.moveStart = null
+      this.gesture = null
       return
     }
 
@@ -393,7 +450,7 @@ export class CanvasEngine {
         before: this.cloneCanvas(this.snapshotCanvas),
         after: this.cloneCanvas(target.canvas),
       })
-      this.onLayerPixelsChanged?.(this.strokeLayerId)
+      this.notifyPixels(this.strokeLayerId)
     }
 
     this.target = null
@@ -423,7 +480,7 @@ export class CanvasEngine {
    *  has no node (e.g. before its delete-undo has recreated it). */
   restorePixels(layerId: string, snapshot: HTMLCanvasElement) {
     this.restore(layerId, snapshot)
-    this.onLayerPixelsChanged?.(layerId)
+    this.notifyPixels(layerId)
   }
 
   /** Clone a layer's current pixels into a detached canvas, or null if it has no node.
@@ -506,7 +563,7 @@ export class CanvasEngine {
         width: DOC_WIDTH,
         height: DOC_HEIGHT,
       },
-      (id) => this.getLayerOffset(id),
+      (id) => this.getLayerTransform(id),
     )
 
     out.toBlob((blob) => {
@@ -545,7 +602,7 @@ export class CanvasEngine {
         width: DOC_WIDTH,
         height: DOC_HEIGHT,
       },
-      (id) => this.getLayerOffset(id),
+      (id) => this.getLayerTransform(id),
     )
 
     const d = ctx.getImageData(x, y, 1, 1).data
@@ -561,11 +618,11 @@ export class CanvasEngine {
     if (!target?.image.visible()) return
     const point = this.screenToDoc(clientX, clientY)
     if (!point) return
-    // Fill in the layer's buffer-local space; a click where a moved layer no longer covers
-    // (buffer coord out of bounds) is a no-op.
-    const off = this.getLayerOffset(this.activeLayerId)
-    const x = Math.floor(point.x - off.x)
-    const y = Math.floor(point.y - off.y)
+    // Fill in the layer's buffer-local space (inverse transform); a click where a transformed
+    // layer no longer covers (buffer coord out of bounds) is a no-op.
+    const buf = invert(this.getLayerTransform(this.activeLayerId), point)
+    const x = Math.floor(buf.x)
+    const y = Math.floor(buf.y)
     if (x < 0 || y < 0 || x >= DOC_WIDTH || y >= DOC_HEIGHT) return
 
     const before = this.cloneCanvas(target.canvas)
@@ -582,7 +639,7 @@ export class CanvasEngine {
       before,
       after: this.cloneCanvas(target.canvas),
     })
-    this.onLayerPixelsChanged?.(this.activeLayerId)
+    this.notifyPixels(this.activeLayerId)
   }
 
   /** Draw a decoded image into the active layer, fit-centered. Pixels only — no history
@@ -594,7 +651,7 @@ export class CanvasEngine {
     node.ctx.globalAlpha = 1
     drawImageContain(node.ctx, source, srcW, srcH, DOC_WIDTH, DOC_HEIGHT)
     this.layer?.batchDraw()
-    this.onLayerPixelsChanged?.(this.activeLayerId)
+    this.notifyPixels(this.activeLayerId)
   }
 
   // ── internals ──────────────────────────────────────────────────────────────
@@ -696,6 +753,7 @@ export class CanvasEngine {
     this.layer.scale({ x: view.scale, y: view.scale })
     this.layer.position({ x: view.x, y: view.y })
     this.layer.batchDraw()
+    this.renderOverlay() // handles are screen-space — reposition them on zoom/resize
   }
 
   /** Map a screen-space pointer to document space using the current view transform. */
@@ -707,6 +765,146 @@ export class CanvasEngine {
       x: (clientX - rect.left - view.x) / view.scale,
       y: (clientY - rect.top - view.y) / view.scale,
     }
+  }
+
+  // ── free-transform overlay + hit-testing ────────────────────────────────────
+
+  /** Apply a transform to a Konva.Image: position + uniform scale + rotation (radians→degrees),
+   *  pivoting about the buffer origin so it matches `apply()` in transform.ts. */
+  private applyTransformToNode(node: RasterNode, t: Transform) {
+    node.image.position({ x: t.x, y: t.y })
+    node.image.scale({ x: t.scale, y: t.scale })
+    node.image.rotation((t.rotation * 180) / Math.PI)
+  }
+
+  /** The current view transform (doc→stage scale & offset). */
+  private view() {
+    const rect = this.container?.getBoundingClientRect()
+    return computeView(rect?.width ?? 1, rect?.height ?? 1, DOC_WIDTH, DOC_HEIGHT, this.zoom)
+  }
+
+  /** Map a document point to stage/overlay (container-relative) pixels. */
+  private docToScreen(d: Point): Point {
+    const v = this.view()
+    return { x: v.x + d.x * v.scale, y: v.y + d.y * v.scale }
+  }
+
+  /** Content bounds of the active layer's buffer (cached — the scan is too costly per move). */
+  private activeContentBox(): Bounds | null {
+    const id = this.activeLayerId
+    if (this.contentBoxCache?.layerId === id) return this.contentBoxCache.box
+    const node = this.nodes.get(id)
+    const box = node
+      ? contentBounds(
+          node.ctx.getImageData(0, 0, DOC_WIDTH, DOC_HEIGHT).data,
+          DOC_WIDTH,
+          DOC_HEIGHT,
+        )
+      : null
+    this.contentBoxCache = { layerId: id, box }
+    return box
+  }
+
+  private invalidateContentBox() {
+    this.contentBoxCache = null
+  }
+
+  /** A layer's buffer pixels changed: drop the cached content box and notify the chrome (thumbnail). */
+  private notifyPixels(layerId: string) {
+    this.invalidateContentBox()
+    this.onLayerPixelsChanged?.(layerId)
+  }
+
+  /** Doc-space position of the rotate grip: above the box's top-edge centre, ROTATE_GRIP_DIST
+   *  screen px out along the box's (rotated) up axis. */
+  private gripDoc(box: Bounds, t: Transform): Point {
+    const topCentre = apply(t, { x: box.x + box.w / 2, y: box.y })
+    const up = { x: Math.sin(t.rotation), y: -Math.cos(t.rotation) } // box local −Y, rotated
+    const d = ROTATE_GRIP_DIST / this.view().scale
+    return { x: topCentre.x + up.x * d, y: topCentre.y + up.y * d }
+  }
+
+  /** Which transform handle (if any) the doc-space press is on — scale (corner) or rotate (grip). */
+  private hitTestHandle(pressDoc: Point): Gesture | null {
+    const box = this.activeContentBox()
+    if (!box) return null
+    const t = this.getLayerTransform(this.activeLayerId)
+    const corners = boxCorners(box).map((c) => apply(t, c))
+    const r = HANDLE_HIT / this.view().scale
+    const near = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.y - b.y) <= r
+    for (let i = 0; i < 4; i++) {
+      const c = corners[i]
+      if (c && near(pressDoc, c)) {
+        const anchor = corners[(i + 2) % 4]
+        if (anchor) return { kind: "scale", anchor }
+      }
+    }
+    if (near(pressDoc, this.gripDoc(box, t))) {
+      return { kind: "rotate", centre: apply(t, { x: box.x + box.w / 2, y: box.y + box.h / 2 }) }
+    }
+    return null
+  }
+
+  /** Redraw the selection box + handles. Shown only while Move is active over a visible layer with
+   *  content; otherwise the overlay is cleared. Drawn in screen space so handles stay constant. */
+  private renderOverlay() {
+    const ov = this.overlay
+    if (!ov) return
+    ov.destroyChildren()
+    const node = this.nodes.get(this.activeLayerId)
+    const box =
+      this.brush.tool === "select" && node?.image.visible() ? this.activeContentBox() : null
+    if (!box) {
+      ov.batchDraw()
+      return
+    }
+    const t = this.getLayerTransform(this.activeLayerId)
+    const corners = boxCorners(box).map((c) => this.docToScreen(apply(t, c)))
+    ov.add(
+      new Konva.Line({
+        points: corners.flatMap((p) => [p.x, p.y]),
+        closed: true,
+        stroke: SELECT_ACCENT,
+        strokeWidth: 1,
+        listening: false,
+      }),
+    )
+    const stemTop = this.docToScreen(apply(t, { x: box.x + box.w / 2, y: box.y }))
+    const grip = this.docToScreen(this.gripDoc(box, t))
+    ov.add(
+      new Konva.Line({
+        points: [stemTop.x, stemTop.y, grip.x, grip.y],
+        stroke: SELECT_ACCENT,
+        strokeWidth: 1,
+        listening: false,
+      }),
+    )
+    ov.add(
+      new Konva.Circle({
+        x: grip.x,
+        y: grip.y,
+        radius: HANDLE_SIZE / 2,
+        fill: "#fff",
+        stroke: SELECT_ACCENT,
+        strokeWidth: 1,
+        listening: false,
+      }),
+    )
+    for (const p of corners) {
+      ov.add(
+        new Konva.Rect({
+          x: p.x - HANDLE_SIZE / 2,
+          y: p.y - HANDLE_SIZE / 2,
+          width: HANDLE_SIZE,
+          height: HANDLE_SIZE,
+          fill: "#fff",
+          stroke: SELECT_ACCENT,
+          strokeWidth: 1,
+          listening: false,
+        }),
+      )
+    }
+    ov.batchDraw()
   }
 }
 

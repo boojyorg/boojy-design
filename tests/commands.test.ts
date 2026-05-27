@@ -22,8 +22,8 @@ const ids = () => useDocumentStore.getState().layers.map((l) => l.id)
 const fakePort = (canvas: HTMLCanvasElement | null): PixelPort => ({
   captureLayerPixels: vi.fn(() => canvas),
   stashPixelRestore: vi.fn(),
-  getLayerOffset: vi.fn(() => ({ x: 0, y: 0 })),
-  setLayerOffset: vi.fn(),
+  getLayerTransform: vi.fn(() => ({ x: 0, y: 0, scale: 1, rotation: 0 })),
+  setLayerTransform: vi.fn(),
 })
 
 describe("runUndoable", () => {
@@ -95,13 +95,14 @@ describe("runDuplicateLayer", () => {
     expect(port.stashPixelRestore).toHaveBeenCalledWith("dup1", captured)
   })
 
-  it("copies the source layer's display offset onto the duplicate (lands in place)", () => {
+  it("copies the source layer's transform onto the duplicate (lands in place)", () => {
     const { record } = recorder()
     const port = fakePort(null)
-    vi.mocked(port.getLayerOffset).mockReturnValue({ x: 12, y: -4 })
+    const transform = { x: 12, y: -4, scale: 1.5, rotation: 0.2 }
+    vi.mocked(port.getLayerTransform).mockReturnValue(transform)
 
     runDuplicateLayer("l3", "dup1", port, record)
-    expect(port.getLayerOffset).toHaveBeenCalledWith("l3")
-    expect(port.setLayerOffset).toHaveBeenCalledWith("dup1", { x: 12, y: -4 })
+    expect(port.getLayerTransform).toHaveBeenCalledWith("l3")
+    expect(port.setLayerTransform).toHaveBeenCalledWith("dup1", transform)
   })
 })

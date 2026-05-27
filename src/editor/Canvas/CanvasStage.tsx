@@ -1,5 +1,6 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef } from "react"
 import { CanvasEngine } from "@/editor/Canvas/engine/CanvasEngine"
+import { IDENTITY, type Transform } from "@/editor/Canvas/engine/transform"
 import { useThumbnailStore } from "@/editor/state/thumbnailStore"
 import { useUndoStore } from "@/editor/state/undoStore"
 import type { Layer, ToolId, VectorKind } from "@/editor/types"
@@ -45,12 +46,12 @@ export interface CanvasStageHandle {
   captureLayerPixels: (layerId: string) => HTMLCanvasElement | null
   /** Queue a pixel snapshot to paint into a layer once its node next exists (after a sync). */
   stashPixelRestore: (layerId: string, canvas: HTMLCanvasElement) => void
-  /** A layer's non-destructive display offset (for save + duplicate). */
-  getLayerOffset: (layerId: string) => { x: number; y: number }
-  /** Set a layer's display offset (for open + duplicate). */
-  setLayerOffset: (layerId: string, offset: { x: number; y: number }) => void
-  /** Drop all stored offsets (on opening a new document). */
-  clearOffsets: () => void
+  /** A layer's non-destructive transform (for save + duplicate). */
+  getLayerTransform: (layerId: string) => Transform
+  /** Set a layer's transform (for open + duplicate). */
+  setLayerTransform: (layerId: string, transform: Transform) => void
+  /** Drop all stored transforms (on opening a new document). */
+  clearTransforms: () => void
 }
 
 export const CanvasStage = forwardRef<CanvasStageHandle, CanvasStageProps>(
@@ -91,9 +92,10 @@ export const CanvasStage = forwardRef<CanvasStageHandle, CanvasStageProps>(
         stashPixelRestore: (layerId, canvas) => {
           pendingPixelRestoresRef.current.push({ layerId, canvas })
         },
-        getLayerOffset: (layerId) => engineRef.current?.getLayerOffset(layerId) ?? { x: 0, y: 0 },
-        setLayerOffset: (layerId, offset) => engineRef.current?.setLayerOffset(layerId, offset),
-        clearOffsets: () => engineRef.current?.clearOffsets(),
+        getLayerTransform: (layerId) => engineRef.current?.getLayerTransform(layerId) ?? IDENTITY,
+        setLayerTransform: (layerId, transform) =>
+          engineRef.current?.setLayerTransform(layerId, transform),
+        clearTransforms: () => engineRef.current?.clearTransforms(),
       }),
       [importImage],
     )
@@ -129,12 +131,12 @@ export const CanvasStage = forwardRef<CanvasStageHandle, CanvasStageProps>(
           redo: () => engineRef.current?.restorePixels(commit.layerId, commit.after),
         })
       })
-      // A move is an offset change (no pixels) — undo/redo just replays the before/after offset.
+      // A transform change (no pixels) — undo/redo just replays the before/after transform.
       engineRef.current?.setOnMoveCommitted((commit) => {
         record({
-          label: "move",
-          undo: () => engineRef.current?.setLayerOffset(commit.layerId, commit.before),
-          redo: () => engineRef.current?.setLayerOffset(commit.layerId, commit.after),
+          label: "transform",
+          undo: () => engineRef.current?.setLayerTransform(commit.layerId, commit.before),
+          redo: () => engineRef.current?.setLayerTransform(commit.layerId, commit.after),
         })
       })
       // Refresh the changed layer's panel thumbnail (fires on stroke/shape/fill/import/restore).

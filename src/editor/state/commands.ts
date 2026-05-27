@@ -1,3 +1,4 @@
+import type { Transform } from "@/editor/Canvas/engine/transform"
 import { type DocumentSnapshot, useDocumentStore } from "@/editor/state/documentStore"
 import type { Command } from "@/editor/state/undoStore"
 
@@ -17,10 +18,10 @@ export interface PixelPort {
   captureLayerPixels: (layerId: string) => HTMLCanvasElement | null
   /** Queue a pixel snapshot to paint into a layer once its node next exists (after a sync). */
   stashPixelRestore: (layerId: string, canvas: HTMLCanvasElement) => void
-  /** Read a layer's non-destructive display offset. */
-  getLayerOffset: (layerId: string) => { x: number; y: number }
-  /** Set a layer's offset; applied to the node on the next sync if it doesn't exist yet. */
-  setLayerOffset: (layerId: string, offset: { x: number; y: number }) => void
+  /** Read a layer's non-destructive transform. */
+  getLayerTransform: (layerId: string) => Transform
+  /** Set a layer's transform; applied to the node on the next sync if it doesn't exist yet. */
+  setLayerTransform: (layerId: string, transform: Transform) => void
 }
 
 function snapshot(): DocumentSnapshot {
@@ -96,10 +97,10 @@ export function runDuplicateLayer(
 ): void {
   const before = snapshot()
   const pixels = port.captureLayerPixels(sourceId)
-  const offset = port.getLayerOffset(sourceId) // copy lands in the same place as the source
+  const transform = port.getLayerTransform(sourceId) // copy lands in the same place as the source
   if (pixels) port.stashPixelRestore(newId, pixels)
   useDocumentStore.getState().duplicateLayer(sourceId, newId)
-  port.setLayerOffset(newId, offset) // stored now; positioned when the sync creates the node
+  port.setLayerTransform(newId, transform) // stored now; applied when the sync creates the node
   const after = snapshot()
   if (sameDoc(before, after)) return // source missing — nothing happened
   record({
@@ -107,7 +108,7 @@ export function runDuplicateLayer(
     undo: () => restore(before), // removes the copy → its node is destroyed
     redo: () => {
       if (pixels) port.stashPixelRestore(newId, pixels)
-      port.setLayerOffset(newId, offset)
+      port.setLayerTransform(newId, transform)
       restore(after)
     },
   })

@@ -15,10 +15,10 @@ landed and the **MVP paint loop is in place** — paint/erase in any colour acro
 `documentStore`, undo/redo is a **unified timeline** (`undoStore`) — strokes *and* every layer
 op (incl. undo-delete with pixels) on one stack — documents **save/open** as `.design`
 files (`src/lib/designFile.ts`), the **Shape tool** draws filled rect/ellipse (drag to
-size, Shift = square/circle) onto the active layer, the **Move tool** repositions the active
-layer **non-destructively** via a per-layer display offset (pixels never leave the buffer), and
-the **Layers panel shows live pixel thumbnails** per layer (fed by an engine `onLayerPixelsChanged`
-signal → `thumbnailStore`). Next are the remaining v0.5 tools.
+size, Shift = square/circle) onto the active layer, the **Move tool** is a **free transform** —
+non-destructive move + uniform scale + rotate via a per-layer engine transform (pixels never leave
+the buffer) — and the **Layers panel shows live pixel thumbnails** per layer (fed by an engine
+`onLayerPixelsChanged` signal → `thumbnailStore`). Next are the remaining v0.5 tools.
 
 Two things that still shape any change:
 - **The canvas is a seam.** `src/editor/Canvas/CanvasStage.tsx` mounts the imperative Konva
@@ -71,7 +71,7 @@ Two load-bearing rules:
   local `pnpm test` alone is weaker (a change can pass it yet fail CI on a lint/format/import-order
   nit or a Storybook break). Wait for CI, then merge.
 - **Canvas / engine / visual features need a `pnpm dev` walkthrough *before* merge.** The engine
-  no-ops under jsdom, so automated tests cover the *pure logic* (stamp/offset/flatten/fill math,
+  no-ops under jsdom, so automated tests cover the *pure logic* (stamp/transform/flatten/fill math,
   persistence round-trips) but never the live drag, paint, clip, or render. Non-visual work
   (state, chrome, persistence format, pure helpers) is fully covered by CI and can merge on green
   without a walkthrough.
@@ -94,9 +94,9 @@ Two load-bearing rules:
   shortcut map telling the same story.
 - **`src/editor/types.ts`** — the layer model is intentionally thin (no `transform`,
   `bitmap`, or blend mode). Those are engine-phase; don't add them to make the shell "more
-  real." The **Move tool upholds this**: a layer's translate lives as a per-layer display offset
-  in the **engine** (a `Map<layerId,{x,y}>` in `CanvasEngine`), *not* as a `transform` field on
-  the model — "transforms are engine-phase." Scale/rotate would need the real transform model — deferred.
+  real." The **Move tool's free transform upholds this**: a layer's `{x,y,scale,rotation}` lives in
+  the **engine** (a `Map<layerId, Transform>` in `CanvasEngine`, see `transform.ts`), *not* as a
+  field on the model — "transforms are engine-phase." Scale is uniform; non-uniform/skew deferred.
 - **Design tokens (Tailwind v4, CSS-first):** `src/theme/base.tokens.css` holds the
   **shared** Boojy tokens (surfaces, text, semantics) in an `@theme` block;
   `src/theme/accent.design.css` holds the **per-product accent** (amber). Reskinning to
@@ -177,21 +177,25 @@ foreground, a 0–100 **Tolerance** slider (top bar) controlling match looseness
 undoable via the same commit path as a stroke. To avoid a fringe ring on soft strokes the fill
 **composites the colour *under* the anti-aliased edge** ("fill behind"): it marches out from the
 flood into the feather, blending the fill beneath each `0<alpha<255` pixel and halting at the
-solid core and the transparent exterior. Plus the **Move tool** (`CanvasEngine`'s `select` branch
-of begin/continue/endStroke + `nudgeActiveLayer`; offset math in `move.ts`): a rail tool (`V`)
-that repositions the active layer **non-destructively** — it sets a per-layer **display offset**
-(`getLayerOffset`/`setLayerOffset`, an engine-side `Map`) and just repositions the Konva image,
-so **pixels never move inside their buffer**. Drag a layer off-page and back and the hidden part
-survives; off-page pixels are *clipped to the page* (the content layer is `clip`-bounded) on
-screen and in export, but kept in the buffer. Arrow keys nudge (1px, 10px with Shift). The move is
-**translate-only** and undoable via a cheap **offset command** (before/after `{x,y}`, no pixel
-clone) — `setOnMoveCommitted` → `undoStore`. Because the buffer stays in its own local space,
-paint ops are unchanged: only the *input point* is shifted by `−offset` (brush/shape/fill), and
-**composite reads go through an offset-aware `flattenLayers`** (eyedropper, export). The offset is
-saved in `.design` (additive `offsetX/offsetY`, no version bump), copied on duplicate, and restored
-on undo-delete (the `Map` entry outlives the destroyed node; `syncLayers` re-applies it).
-**Next:** the remaining v0.5 tools below. Then v0.5+: Move *scale/rotate* (needs the transform
-model), Text tool, blend modes. These aren't forbidden —
+solid core and the transparent exterior. Plus the **Move tool** = a **free transform**
+(`CanvasEngine`'s `select` branch of begin/continue/endStroke + `nudgeActiveLayer`; geometry in
+`transform.ts`): a rail tool (`V`) that **non-destructively** moves, **uniformly scales** (corner
+handles, about the opposite corner) and **rotates** (a grip; Shift snaps 15°) the active layer.
+It sets a per-layer **similarity transform** `{x, y, scale, rotation}` (`getLayerTransform`/
+`setLayerTransform`, an engine-side `Map`) and applies it to the Konva image, so **pixels never
+move inside their buffer**. The selection box wraps the layer's content (reuses `contentBounds`);
+a press hit-tests the handles to pick scale/rotate/move. Drag off-page and back and the hidden part
+survives; off-page pixels are *clipped to the page* (the content layer is `clip`-bounded) on screen
+and in export, but kept in the buffer. Arrow keys nudge (1px, 10px with Shift). Undoable via a cheap
+**transform command** (before/after `{x,y,scale,rotation}`, no pixel clone) — `setOnMoveCommitted`
+→ `undoStore`. Because the buffer stays in its own local space, paint ops are unchanged except the
+*input point* is run through `invert(transform, …)` (brush/shape/fill), and **composite reads go
+through a transform-aware `flattenLayers`** (eyedropper, export). The transform is saved in
+`.design` (additive `transform` field — legacy `offsetX/offsetY` still read as translate), copied
+on duplicate, and restored on undo-delete (the `Map` entry outlives the destroyed node; `syncLayers`
+re-applies it). The selection box + handles draw on a **screen-space overlay** layer so they stay a
+constant size under zoom. **Next:** the remaining v0.5 tools below. Then v0.5+: Move *non-uniform
+scale / skew*, Text tool, blend modes. These aren't forbidden —
 they're sequenced. Don't pile features onto the shell
 all at once; the **8-feature MVP cap** is the discipline lever. As a side-project this sits
 behind Igni / Boojy Audio / DELE — keep changes small and shippable.

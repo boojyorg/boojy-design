@@ -1,6 +1,7 @@
 import { type ChangeEvent, useCallback, useMemo, useRef } from "react"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { CanvasStage, type CanvasStageHandle } from "@/editor/Canvas/CanvasStage"
+import { IDENTITY } from "@/editor/Canvas/engine/transform"
 import { DOC_HEIGHT, DOC_WIDTH } from "@/editor/Canvas/engine/types"
 import { LeftRail } from "@/editor/LeftRail/LeftRail"
 import { ShapeFlyout } from "@/editor/LeftRail/ShapeFlyout"
@@ -47,8 +48,8 @@ export function EditorV1() {
     () => ({
       captureLayerPixels: (id) => stageRef.current?.captureLayerPixels(id) ?? null,
       stashPixelRestore: (id, canvas) => stageRef.current?.stashPixelRestore(id, canvas),
-      getLayerOffset: (id) => stageRef.current?.getLayerOffset(id) ?? { x: 0, y: 0 },
-      setLayerOffset: (id, offset) => stageRef.current?.setLayerOffset(id, offset),
+      getLayerTransform: (id) => stageRef.current?.getLayerTransform(id) ?? IDENTITY,
+      setLayerTransform: (id, transform) => stageRef.current?.setLayerTransform(id, transform),
     }),
     [],
   )
@@ -64,7 +65,7 @@ export function EditorV1() {
       { layers: docLayers, activeLayerId: active, nextLayerNum },
       (id) => stageRef.current?.captureLayerPixels(id) ?? null,
       { width: DOC_WIDTH, height: DOC_HEIGHT },
-      (id) => stageRef.current?.getLayerOffset(id) ?? { x: 0, y: 0 },
+      (id) => stageRef.current?.getLayerTransform(id) ?? IDENTITY,
     )
     downloadBlob(new Blob([json], { type: "application/json" }), toDesignFilename("Untitled"))
   }, [])
@@ -95,14 +96,14 @@ export function EditorV1() {
             canvas: await decodeDataUrlToCanvas(p.dataUrl),
           })),
         )
-        // Drop the previous document's offsets + thumbnails, then stash pixels + offsets for the
-        // new layers; the layers effect's sync creates the nodes (pixel restore repaints thumbs).
-        stageRef.current?.clearOffsets()
+        // Drop the previous document's transforms + thumbnails, then stash pixels + transforms for
+        // the new layers; the layers effect's sync creates the nodes (pixel restore repaints thumbs).
+        stageRef.current?.clearTransforms()
         useThumbnailStore.getState().clearThumbnails()
         for (const { layerId, canvas } of decoded)
           stageRef.current?.stashPixelRestore(layerId, canvas)
-        for (const o of parsed.offsets)
-          stageRef.current?.setLayerOffset(o.layerId, { x: o.x, y: o.y })
+        for (const { layerId, transform } of parsed.transforms)
+          stageRef.current?.setLayerTransform(layerId, transform)
         useDocumentStore.setState(parsed.snapshot)
         clearUndo()
       } catch (err) {

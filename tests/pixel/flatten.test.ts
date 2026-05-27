@@ -1,6 +1,7 @@
 import { type Canvas, createCanvas } from "@napi-rs/canvas"
 import { describe, expect, it } from "vitest"
 import { flattenLayers } from "@/editor/Canvas/engine/flatten"
+import { IDENTITY, type Transform } from "@/editor/Canvas/engine/transform"
 import type { Layer } from "@/editor/types"
 
 // Real-canvas tests (node project, @napi-rs/canvas). The @napi-rs context implements the
@@ -24,7 +25,7 @@ function flatten(
   layers: Layer[],
   canvases: Record<string, Canvas>,
   background: "white" | "transparent",
-  offsets: Record<string, { x: number; y: number }> = {},
+  transforms: Record<string, Transform> = {},
 ): Uint8ClampedArray {
   const out = createCanvas(W, H)
   const ctx = out.getContext("2d")
@@ -33,7 +34,7 @@ function flatten(
     layers,
     (id) => canvases[id] as unknown as CanvasImageSource | undefined,
     { background, backgroundColor: "#ffffff", width: W, height: H },
-    (id) => offsets[id] ?? { x: 0, y: 0 },
+    (id) => transforms[id] ?? IDENTITY,
   )
   return ctx.getImageData(0, 0, W, H).data as unknown as Uint8ClampedArray
 }
@@ -64,8 +65,10 @@ describe("flattenLayers (real canvas)", () => {
     expect(d[2]).toBeLessThan(136)
   })
 
-  it("composites a layer at its display offset and clips content past the edge", () => {
-    const d = flatten([layer("a")], { a: solid("#ff0000") }, "transparent", { a: { x: 1, y: 0 } })
+  it("composites a layer translated by its transform and clips content past the edge", () => {
+    const d = flatten([layer("a")], { a: solid("#ff0000") }, "transparent", {
+      a: { x: 1, y: 0, scale: 1, rotation: 0 },
+    })
     const px = (x: number, y: number) => {
       const i = (y * W + x) * 4
       return [d[i], d[i + 1], d[i + 2], d[i + 3]]
@@ -73,6 +76,19 @@ describe("flattenLayers (real canvas)", () => {
     expect(px(0, 0)).toEqual([0, 0, 0, 0]) // vacated column — the layer shifted right
     expect(px(1, 0)).toEqual([255, 0, 0, 255]) // red, one px right
     expect(px(3, 0)).toEqual([255, 0, 0, 255]) // still covered; the rightmost source column clipped
+  })
+
+  it("composites a layer scaled down about the origin", () => {
+    // scale 0.5 draws the 4×4 source into a 2×2 block at the top-left.
+    const d = flatten([layer("a")], { a: solid("#ff0000") }, "transparent", {
+      a: { x: 0, y: 0, scale: 0.5, rotation: 0 },
+    })
+    const px = (x: number, y: number) => {
+      const i = (y * W + x) * 4
+      return [d[i], d[i + 1], d[i + 2], d[i + 3]]
+    }
+    expect(px(0, 0)).toEqual([255, 0, 0, 255]) // inside the scaled block
+    expect(px(3, 3)).toEqual([0, 0, 0, 0]) // outside it → transparent
   })
 
   it("paints top-of-stack (index 0) last", () => {
