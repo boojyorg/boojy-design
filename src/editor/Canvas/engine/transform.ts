@@ -107,12 +107,18 @@ const RESIZE_CURSORS = [
 /**
  * The CSS cursor for a handle, **remapped for the layer's rotation** so it always points the right
  * way: a 90°-rotated layer's top handle shows `ew-resize`, not `ns-resize`. Rotation is snapped to
- * the nearest 45° sector and the index shifted clockwise around the box.
+ * the nearest 45° sector and the index shifted clockwise around the box. Pass `flipped = true`
+ * (exactly one of scaleX/scaleY is negative) to swap the diagonal cursors `nesw`↔`nwse`; a
+ * double-flip (both negative) is a 180° visual rotation, which the sector shift already handles.
  */
-export function resizeCursor(handleIndex: number, rotationDeg: number): string {
+export function resizeCursor(handleIndex: number, rotationDeg: number, flipped = false): string {
   const normalized = ((rotationDeg % 360) + 360) % 360
   const sectorOffset = Math.round(normalized / 45) % 8
-  return RESIZE_CURSORS[(handleIndex + sectorOffset) % 8] ?? "default"
+  const cursor = RESIZE_CURSORS[(handleIndex + sectorOffset) % 8] ?? "default"
+  if (!flipped) return cursor
+  if (cursor === "nesw-resize") return "nwse-resize"
+  if (cursor === "nwse-resize") return "nesw-resize"
+  return cursor
 }
 
 /** Translate the transform by a document-space delta (the move gesture / arrow nudge). */
@@ -183,13 +189,12 @@ export function resize(
     const base = dist(apply(start, handleBuf), anchorDoc)
     if (base > 1e-6) {
       const f = Math.hypot(cv.x, cv.y) / base
-      // Derive per-axis sign from the signed projection so dragging past the anchor flips the axis.
-      const tx = (cv.x * ux.x + cv.y * ux.y) / dBx
-      const ty = (cv.x * uy.x + cv.y * uy.y) / dBy
-      const sx = tx < 0 ? -1 : 1
-      const sy = ty < 0 ? -1 : 1
-      scaleX = sx * Math.abs(start.scaleX) * f
-      scaleY = sy * Math.abs(start.scaleY) * f
+      // Bishop constraint: both axes share one sign derived from the diagonal projection.
+      // Negative = cursor crossed past the anchor → both axes flip together; never one alone.
+      const handleDir = sub(apply(start, handleBuf), anchorDoc)
+      const diagSign = cv.x * handleDir.x + cv.y * handleDir.y < 0 ? -1 : 1
+      scaleX = diagSign * start.scaleX * f
+      scaleY = diagSign * start.scaleY * f
     }
   } else {
     if (dBx !== 0) scaleX = (cv.x * ux.x + cv.y * ux.y) / dBx

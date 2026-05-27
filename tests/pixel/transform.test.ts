@@ -65,7 +65,7 @@ describe("resize", () => {
     expect(near(apply(next, { x: 0, y: 50 }).x, 0)).toBe(true)
   })
 
-  it("corner proportional mirrors when dragged diagonally past the anchor, keeping sign per axis", () => {
+  it("corner proportional mirrors when dragged diagonally past the anchor, both axes flip", () => {
     // BR corner (index 3), anchor TL (0,0); drag cursor to (-200, -200) → both axes flip.
     const next = resize(IDENTITY, BOX, 3, { x: -200, y: -200 }, { proportional: true })
     expect(next.scaleX).toBeLessThan(0)
@@ -73,6 +73,12 @@ describe("resize", () => {
     // Anchor (TL, buffer 0,0) stays fixed.
     expect(near(apply(next, { x: 0, y: 0 }).x, 0)).toBe(true)
     expect(near(apply(next, { x: 0, y: 0 }).y, 0)).toBe(true)
+  })
+
+  it("bishop constraint: proportional corner drag can never flip only one axis", () => {
+    // Drag BR (index 3) leftward past the anchor but not diagonally — old code flipped X only.
+    const next = resize(IDENTITY, BOX, 3, { x: -200, y: 50 }, { proportional: true })
+    expect(next.scaleX < 0).toBe(next.scaleY < 0) // signs must always match
   })
 })
 
@@ -84,6 +90,13 @@ describe("resizeCursor", () => {
 
   it("remaps for rotation (90° turns the top handle east-west)", () => {
     expect(resizeCursor(0, 90)).toBe("ew-resize")
+  })
+
+  it("flipped=true swaps diagonal cursors, leaves axis cursors unchanged", () => {
+    expect(resizeCursor(1, 0, true)).toBe("nwse-resize") // TR: nesw → nwse
+    expect(resizeCursor(3, 0, true)).toBe("nesw-resize") // BR: nwse → nesw
+    expect(resizeCursor(0, 0, true)).toBe("ns-resize") // Top: axis cursor unchanged
+    expect(resizeCursor(2, 0, true)).toBe("ew-resize") // Right: axis cursor unchanged
   })
 })
 
