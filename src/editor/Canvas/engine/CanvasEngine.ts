@@ -101,6 +101,9 @@ export class CanvasEngine {
   private brush: BrushParams = DEFAULT_BRUSH
   private activeLayerId = ""
   private zoom = 100
+  // Pan offset in screen-space pixels, added on top of the centred view (set via setView).
+  private panX = 0
+  private panY = 0
   // Last layer list handed to syncLayers — authoritative order/visibility/opacity for export.
   private layers: Layer[] = []
   // The engine captures full-layer before/after snapshots per stroke and emits them; the
@@ -212,8 +215,11 @@ export class CanvasEngine {
     this.renderOverlay() // show/hide the selection overlay as the active tool changes
   }
 
-  setZoom(zoom: number) {
+  /** Set the full view (zoom % + pan offset). Pan is screen-space pixels over the centred view. */
+  setView(zoom: number, panX: number, panY: number) {
     this.zoom = zoom
+    this.panX = panX
+    this.panY = panY
     this.applyView()
   }
 
@@ -763,7 +769,7 @@ export class CanvasEngine {
     const width = this.container.clientWidth || 1
     const height = this.container.clientHeight || 1
     this.stage.size({ width, height })
-    const view = computeView(width, height, DOC_WIDTH, DOC_HEIGHT, this.zoom)
+    const view = computeView(width, height, DOC_WIDTH, DOC_HEIGHT, this.zoom, this.panX, this.panY)
     this.layer.scale({ x: view.scale, y: view.scale })
     this.layer.position({ x: view.x, y: view.y })
     this.layer.batchDraw()
@@ -774,7 +780,15 @@ export class CanvasEngine {
   private screenToDoc(clientX: number, clientY: number): Point | null {
     if (!this.container) return null
     const rect = this.container.getBoundingClientRect()
-    const view = computeView(rect.width, rect.height, DOC_WIDTH, DOC_HEIGHT, this.zoom)
+    const view = computeView(
+      rect.width,
+      rect.height,
+      DOC_WIDTH,
+      DOC_HEIGHT,
+      this.zoom,
+      this.panX,
+      this.panY,
+    )
     return {
       x: (clientX - rect.left - view.x) / view.scale,
       y: (clientY - rect.top - view.y) / view.scale,
@@ -794,7 +808,15 @@ export class CanvasEngine {
   /** The current view transform (doc→stage scale & offset). */
   private view() {
     const rect = this.container?.getBoundingClientRect()
-    return computeView(rect?.width ?? 1, rect?.height ?? 1, DOC_WIDTH, DOC_HEIGHT, this.zoom)
+    return computeView(
+      rect?.width ?? 1,
+      rect?.height ?? 1,
+      DOC_WIDTH,
+      DOC_HEIGHT,
+      this.zoom,
+      this.panX,
+      this.panY,
+    )
   }
 
   /** Map a document point to stage/overlay (container-relative) pixels. */

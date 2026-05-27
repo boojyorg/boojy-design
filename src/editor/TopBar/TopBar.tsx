@@ -23,6 +23,7 @@ interface TopBarProps {
   onFillTolerance: (v: number) => void
   onZoomIn: () => void
   onZoomOut: () => void
+  onZoomFit: () => void
   onToggleRight: () => void
   onExport: () => void
   onOpen: () => void
@@ -60,7 +61,12 @@ export function TopBar(props: TopBarProps) {
         </IconButton>
       </div>
 
-      <ZoomControl zoom={props.zoom} onZoomIn={props.onZoomIn} onZoomOut={props.onZoomOut} />
+      <ZoomControl
+        zoom={props.zoom}
+        onZoomIn={props.onZoomIn}
+        onZoomOut={props.onZoomOut}
+        onFit={props.onZoomFit}
+      />
 
       <Divider height={26} />
 

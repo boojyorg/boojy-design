@@ -3,14 +3,16 @@ import { beforeEach } from "vitest"
 import { initialDocumentState, useDocumentStore } from "@/editor/state/documentStore"
 import { useThumbnailStore } from "@/editor/state/thumbnailStore"
 import { useUndoStore } from "@/editor/state/undoStore"
+import { useViewportStore } from "@/editor/state/viewportStore"
 
-// The document, undo and thumbnail stores are module singletons, so their state would
-// otherwise leak between tests (the old per-render useReducer reset for free). Restore
-// fresh document state and clear the undo timeline + thumbnails before every dom test.
+// The document, undo, thumbnail and viewport stores are module singletons, so their state
+// would otherwise leak between tests (the old per-render useReducer reset for free). Restore
+// fresh document state and clear the undo timeline + thumbnails + viewport before every dom test.
 beforeEach(() => {
   useDocumentStore.setState(initialDocumentState())
   useUndoStore.getState().clear()
   useThumbnailStore.getState().clearThumbnails()
+  useViewportStore.getState().reset()
 })
 
 // jsdom lacks several browser APIs that Radix primitives depend on.

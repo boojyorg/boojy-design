@@ -17,6 +17,7 @@ import { newLayerId } from "@/editor/state/ids"
 import { useThumbnailStore } from "@/editor/state/thumbnailStore"
 import { useUndoStore } from "@/editor/state/undoStore"
 import { useEditorState } from "@/editor/state/useEditorState"
+import { useViewportStore } from "@/editor/state/viewportStore"
 import { TopBar } from "@/editor/TopBar/TopBar"
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts"
 import { decodeDataUrlToCanvas, parseDesign, serializeDesign } from "@/lib/designFile"
@@ -39,6 +40,10 @@ export function EditorV1() {
   const undo = useUndoStore((s) => s.undo)
   const redo = useUndoStore((s) => s.redo)
   const clearUndo = useUndoStore((s) => s.clear)
+  const zoom = useViewportStore((s) => s.zoom)
+  const nudgeZoom = useViewportStore((s) => s.nudgeZoom)
+  const fitView = useViewportStore((s) => s.fitToScreen)
+  const zoom100 = useViewportStore((s) => s.zoom100)
   const stageRef = useRef<CanvasStageHandle>(null)
   const imageInputRef = useRef<HTMLInputElement>(null)
   const designInputRef = useRef<HTMLInputElement>(null)
@@ -117,7 +122,17 @@ export function EditorV1() {
     (id: string) => runDuplicateLayer(id, newLayerId(), pixelPort, record),
     [pixelPort, record],
   )
-  useKeyboardShortcuts(dispatch, { onExport, onOpen: onOpenDocument, onSave, onUndo, onRedo })
+  useKeyboardShortcuts(dispatch, {
+    onExport,
+    onOpen: onOpenDocument,
+    onSave,
+    onUndo,
+    onRedo,
+    onZoomIn: () => nudgeZoom(25),
+    onZoomOut: () => nudgeZoom(-25),
+    onZoomFit: fitView,
+    onZoom100: zoom100,
+  })
 
   return (
     <TooltipProvider delayDuration={200}>
@@ -143,15 +158,16 @@ export function EditorV1() {
           opacity={state.opacity}
           foreground={state.foreground}
           fillTolerance={state.fillTolerance}
-          zoom={state.zoom}
+          zoom={zoom}
           rightCollapsed={state.rightCollapsed}
           onBrushSize={(value) => dispatch({ type: "setBrushSize", value })}
           onHardness={(value) => dispatch({ type: "setHardness", value })}
           onOpacity={(value) => dispatch({ type: "setOpacity", value })}
           onForeground={(color) => dispatch({ type: "setForeground", color })}
           onFillTolerance={(value) => dispatch({ type: "setFillTolerance", value })}
-          onZoomIn={() => dispatch({ type: "nudgeZoom", delta: 25 })}
-          onZoomOut={() => dispatch({ type: "nudgeZoom", delta: -25 })}
+          onZoomIn={() => nudgeZoom(25)}
+          onZoomOut={() => nudgeZoom(-25)}
+          onZoomFit={fitView}
           onToggleRight={() => dispatch({ type: "toggleRight" })}
           onExport={onExport}
           onOpen={onOpenDocument}
@@ -188,7 +204,6 @@ export function EditorV1() {
             foreground={state.foreground}
             shapeKind={state.shapeKind}
             fillTolerance={state.fillTolerance}
-            zoom={state.zoom}
             layers={layers}
             activeLayerId={activeLayerId}
             onRequestImageLayer={(name) => addLayer(name, "image")}
