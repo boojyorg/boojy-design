@@ -1,5 +1,6 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef } from "react"
 import { CanvasEngine } from "@/editor/Canvas/engine/CanvasEngine"
+import { IDENTITY, type Transform } from "@/editor/Canvas/engine/transform"
 import { useThumbnailStore } from "@/editor/state/thumbnailStore"
 import { useUndoStore } from "@/editor/state/undoStore"
 import type { Layer, ToolId, VectorKind } from "@/editor/types"
@@ -45,12 +46,12 @@ export interface CanvasStageHandle {
   captureLayerPixels: (layerId: string) => HTMLCanvasElement | null
   /** Queue a pixel snapshot to paint into a layer once its node next exists (after a sync). */
   stashPixelRestore: (layerId: string, canvas: HTMLCanvasElement) => void
-  /** A layer's non-destructive display offset (for save + duplicate). */
-  getLayerOffset: (layerId: string) => { x: number; y: number }
-  /** Set a layer's display offset (for open + duplicate). */
-  setLayerOffset: (layerId: string, offset: { x: number; y: number }) => void
-  /** Drop all stored offsets (on opening a new document). */
-  clearOffsets: () => void
+  /** A layer's non-destructive transform (for save + duplicate). */
+  getLayerTransform: (layerId: string) => Transform
+  /** Set a layer's transform (for open + duplicate). */
+  setLayerTransform: (layerId: string, transform: Transform) => void
+  /** Drop all stored transforms (on opening a new document). */
+  clearTransforms: () => void
 }
 
 export const CanvasStage = forwardRef<CanvasStageHandle, CanvasStageProps>(
@@ -91,9 +92,10 @@ export const CanvasStage = forwardRef<CanvasStageHandle, CanvasStageProps>(
         stashPixelRestore: (layerId, canvas) => {
           pendingPixelRestoresRef.current.push({ layerId, canvas })
         },
-        getLayerOffset: (layerId) => engineRef.current?.getLayerOffset(layerId) ?? { x: 0, y: 0 },
-        setLayerOffset: (layerId, offset) => engineRef.current?.setLayerOffset(layerId, offset),
-        clearOffsets: () => engineRef.current?.clearOffsets(),
+        getLayerTransform: (layerId) => engineRef.current?.getLayerTransform(layerId) ?? IDENTITY,
+        setLayerTransform: (layerId, transform) =>
+          engineRef.current?.setLayerTransform(layerId, transform),
+        clearTransforms: () => engineRef.current?.clearTransforms(),
       }),
       [importImage],
     )
@@ -129,12 +131,12 @@ export const CanvasStage = forwardRef<CanvasStageHandle, CanvasStageProps>(
           redo: () => engineRef.current?.restorePixels(commit.layerId, commit.after),
         })
       })
-      // A move is an offset change (no pixels) — undo/redo just replays the before/after offset.
+      // A transform change (no pixels) — undo/redo just replays the before/after transform.
       engineRef.current?.setOnMoveCommitted((commit) => {
         record({
-          label: "move",
-          undo: () => engineRef.current?.setLayerOffset(commit.layerId, commit.before),
-          redo: () => engineRef.current?.setLayerOffset(commit.layerId, commit.after),
+          label: "transform",
+          undo: () => engineRef.current?.setLayerTransform(commit.layerId, commit.before),
+          redo: () => engineRef.current?.setLayerTransform(commit.layerId, commit.after),
         })
       })
       // Refresh the changed layer's panel thumbnail (fires on stroke/shape/fill/import/restore).
@@ -227,7 +229,9 @@ export const CanvasStage = forwardRef<CanvasStageHandle, CanvasStageProps>(
 
     const isPaintTool = props.tool === "brush" || props.tool === "eraser" || props.tool === "shape"
     const showCrosshair = isPaintTool || props.tool === "eyedropper" || props.tool === "fill"
-    const cursor = props.tool === "select" ? "move" : showCrosshair ? "crosshair" : "default"
+    // For Move, the engine drives the container cursor on hover (handle-aware); for the rest,
+    // a static cursor here. Leaving it undefined for Move lets the engine's imperative set stick.
+    const cursor = props.tool === "select" ? undefined : showCrosshair ? "crosshair" : "default"
 
     return (
       <div
@@ -254,7 +258,11 @@ export const CanvasStage = forwardRef<CanvasStageHandle, CanvasStageProps>(
             e.currentTarget.setPointerCapture(e.pointerId)
             engineRef.current?.beginStroke(e.clientX, e.clientY)
           }}
-          onPointerMove={(e) => engineRef.current?.continueStroke(e.clientX, e.clientY, e.shiftKey)}
+          onPointerMove={(e) => {
+            engineRef.current?.continueStroke(e.clientX, e.clientY, e.shiftKey)
+            // Move tool: update the handle-aware cursor on hover (no-ops mid-drag).
+            if (props.tool === "select") engineRef.current?.pointerHover(e.clientX, e.clientY)
+          }}
           onPointerUp={(e) => {
             engineRef.current?.endStroke()
             if (e.currentTarget.hasPointerCapture(e.pointerId)) {

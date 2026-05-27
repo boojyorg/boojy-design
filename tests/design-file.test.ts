@@ -33,17 +33,49 @@ describe("serializeDesign / parseDesign", () => {
     ])
   })
 
-  it("round-trips per-layer display offsets and skips layers at the origin", () => {
-    const offset = (id: string) => (id === "l2" ? { x: 40, y: -15 } : { x: 0, y: 0 })
-    const json = serializeDesign(snapshot, fakePixels("data:image/png;base64,AAAA"), SIZE, offset)
+  it("round-trips per-layer transforms and skips identity layers", () => {
+    const t = { x: 40, y: -15, scaleX: 1.5, scaleY: 0.8, rotation: 0.3 }
+    const getTransform = (id: string) =>
+      id === "l2" ? t : { x: 0, y: 0, scaleX: 1, scaleY: 1, rotation: 0 }
+    const json = serializeDesign(
+      snapshot,
+      fakePixels("data:image/png;base64,AAAA"),
+      SIZE,
+      getTransform,
+    )
     const parsed = parseDesign(json)
-    // Only the moved layer is recorded; the origin layer is omitted (→ defaults to 0 on open).
-    expect(parsed.offsets).toEqual([{ layerId: "l2", x: 40, y: -15 }])
+    // Only the transformed layer is recorded; the identity layer is omitted (→ identity on open).
+    expect(parsed.transforms).toEqual([{ layerId: "l2", transform: t }])
   })
 
-  it("parses a pre-offset file (no offset fields) with no offsets", () => {
-    const json = serializeDesign(snapshot, fakePixels(null), SIZE) // default getter → origin
-    expect(parseDesign(json).offsets).toEqual([])
+  it("reads a legacy offset-only file as a translate transform", () => {
+    const legacy = JSON.stringify({
+      format: "boojy-design",
+      version: 1,
+      document: SIZE,
+      activeLayerId: "l1",
+      nextLayerNum: 2,
+      layers: [
+        {
+          id: "l1",
+          name: "x",
+          type: "raster",
+          visible: true,
+          opacity: 100,
+          pixels: null,
+          offsetX: 12,
+          offsetY: 7,
+        },
+      ],
+    })
+    expect(parseDesign(legacy).transforms).toEqual([
+      { layerId: "l1", transform: { x: 12, y: 7, scaleX: 1, scaleY: 1, rotation: 0 } },
+    ])
+  })
+
+  it("parses a file with no transform fields as no transforms", () => {
+    const json = serializeDesign(snapshot, fakePixels(null), SIZE) // default getter → identity
+    expect(parseDesign(json).transforms).toEqual([])
   })
 
   it("omits pixel entries for layers with no captured bitmap", () => {

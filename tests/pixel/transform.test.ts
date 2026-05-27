@@ -1,0 +1,102 @@
+import { describe, expect, it } from "vitest"
+import {
+  apply,
+  boxCorners,
+  IDENTITY,
+  invert,
+  resize,
+  resizeCursor,
+  rotateAbout,
+  type Transform,
+} from "@/editor/Canvas/engine/transform"
+
+const near = (a: number, b: number, eps = 1e-9) => Math.abs(a - b) < eps
+const BOX = { x: 0, y: 0, w: 100, h: 100 }
+
+describe("apply / invert", () => {
+  it("identity maps a point to itself", () => {
+    expect(apply(IDENTITY, { x: 12, y: 34 })).toEqual({ x: 12, y: 34 })
+  })
+
+  it("applies per-axis scale then translate", () => {
+    const t: Transform = { x: 10, y: 20, scaleX: 2, scaleY: 3, rotation: 0 }
+    expect(apply(t, { x: 3, y: 4 })).toEqual({ x: 16, y: 32 }) // (3*2+10, 4*3+20)
+  })
+
+  it("round-trips through invert for a rotated, non-uniformly scaled, translated transform", () => {
+    const t: Transform = { x: -40, y: 15, scaleX: 1.7, scaleY: 0.6, rotation: 0.9 }
+    const p = { x: 123, y: -45 }
+    const back = invert(t, apply(t, p))
+    expect(near(back.x, p.x)).toBe(true)
+    expect(near(back.y, p.y)).toBe(true)
+  })
+})
+
+describe("resize", () => {
+  it("edge handle scales only its axis, holding the opposite edge fixed", () => {
+    // Right edge (index 2): drag from x=100 out to x=200 → scaleX 2, scaleY unchanged.
+    const next = resize(IDENTITY, BOX, 2, { x: 200, y: 50 }, { proportional: false })
+    expect(near(next.scaleX, 2)).toBe(true)
+    expect(near(next.scaleY, 1)).toBe(true)
+    expect(apply(next, { x: 0, y: 50 })).toEqual({ x: 0, y: 50 }) // left edge (anchor) fixed
+  })
+
+  it("corner proportional keeps aspect and the opposite corner fixed", () => {
+    // BR corner (index 3), anchor TL (0,0); drag the diagonal out by 2× → both axes ×2.
+    const next = resize(IDENTITY, BOX, 3, { x: 200, y: 200 }, { proportional: true })
+    expect(near(next.scaleX, 2)).toBe(true)
+    expect(near(next.scaleY, 2)).toBe(true)
+    expect(apply(next, { x: 0, y: 0 })).toEqual({ x: 0, y: 0 }) // anchor fixed
+  })
+
+  it("corner free scales each axis independently", () => {
+    const next = resize(IDENTITY, BOX, 3, { x: 200, y: 150 }, { proportional: false })
+    expect(near(next.scaleX, 2)).toBe(true)
+    expect(near(next.scaleY, 1.5)).toBe(true)
+  })
+
+  it("clamps to a positive minimum instead of flipping when dragged past the anchor", () => {
+    const next = resize(IDENTITY, BOX, 2, { x: -50, y: 50 }, { proportional: false })
+    expect(next.scaleX).toBeGreaterThan(0)
+  })
+})
+
+describe("resizeCursor", () => {
+  it("uses the base cursor at no rotation", () => {
+    expect(resizeCursor(0, 0)).toBe("ns-resize") // top edge
+    expect(resizeCursor(2, 0)).toBe("ew-resize") // right edge
+  })
+
+  it("remaps for rotation (90° turns the top handle east-west)", () => {
+    expect(resizeCursor(0, 90)).toBe("ew-resize")
+  })
+})
+
+describe("rotateAbout", () => {
+  it("adds the swept angle and snaps to the nearest step", () => {
+    expect(
+      near(
+        rotateAbout(IDENTITY, { x: 0, y: 0 }, { x: 1, y: 0 }, { x: 0, y: 1 }).rotation,
+        Math.PI / 2,
+      ),
+    ).toBe(true)
+    const to = { x: Math.cos(0.17), y: Math.sin(0.17) } // ~9.7°, snap to 15°
+    expect(
+      near(
+        rotateAbout(IDENTITY, { x: 0, y: 0 }, { x: 1, y: 0 }, to, 15).rotation,
+        (15 * Math.PI) / 180,
+      ),
+    ).toBe(true)
+  })
+})
+
+describe("boxCorners", () => {
+  it("returns TL, TR, BR, BL", () => {
+    expect(boxCorners(BOX)).toEqual([
+      { x: 0, y: 0 },
+      { x: 100, y: 0 },
+      { x: 100, y: 100 },
+      { x: 0, y: 100 },
+    ])
+  })
+})
