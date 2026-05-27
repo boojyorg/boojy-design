@@ -36,6 +36,8 @@ interface CanvasStageProps {
   onRequestImageLayer: (name: string) => void
   /** Eyedropper picked a colour (visible composite under the cursor). */
   onSampleColor: (hex: string) => void
+  /** Move tool clicked a different layer — select it in the document store. */
+  onSelectLayer: (id: string) => void
 }
 
 /** The narrow imperative surface the engine exposes across the seam. */
@@ -163,7 +165,10 @@ export const CanvasStage = forwardRef<CanvasStageHandle, CanvasStageProps>(
         if (url) setThumbnail(layerId, url)
         else removeThumbnail(layerId)
       })
-    }, [record, setThumbnail, removeThumbnail])
+      engineRef.current?.setOnLayerAutoSelected((layerId) => {
+        props.onSelectLayer(layerId)
+      })
+    }, [record, setThumbnail, removeThumbnail, props.onSelectLayer])
 
     useEffect(() => {
       engineRef.current?.setBrush({

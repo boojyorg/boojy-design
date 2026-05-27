@@ -213,6 +213,7 @@ export function EditorV1() {
             activeLayerId={activeLayerId}
             onRequestImageLayer={(name) => addLayer(name, "image")}
             onSampleColor={(hex) => dispatch({ type: "applySampledColor", color: hex })}
+            onSelectLayer={(id) => selectLayer(id)}
           />
           <RightSidebar
             collapsed={state.rightCollapsed}

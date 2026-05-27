@@ -150,6 +150,7 @@ export class CanvasEngine {
   // React can refresh that layer's thumbnail. NOT fired on move — a move only shifts the display
   // offset, and thumbnails show buffer content, so the pixels are unchanged.
   private onLayerPixelsChanged?: (layerId: string) => void
+  private onLayerAutoSelected?: (layerId: string) => void
   // Latest Shift state for the shape constraint — updated by pointer moves *and* by
   // raw Shift key events, so the preview tracks Shift even while the pointer is still.
   private shiftDown = false
@@ -309,11 +310,28 @@ export class CanvasEngine {
     this.strokeLayerId = this.activeLayerId
 
     if (this.brush.tool === "select") {
-      // Free transform: a handle picks scale/rotate, inside the box moves, outside is a no-op.
-      // All non-destructive — only the layer's transform changes, never its pixels.
+      // Free transform: a handle picks scale/rotate, inside the box moves.
+      // A miss auto-selects the top-most visible layer with a non-transparent pixel at
+      // the click point (transform-aware). Falls back to no-op if nothing is hit.
       const gesture = this.hitTest(point)
       if (!gesture) {
         this.target = null
+        // Walk layers top→bottom (layers[0] = topmost) looking for one whose pixel at
+        // the click point is non-transparent.
+        for (const layer of this.layers) {
+          if (!layer.visible) continue
+          const node = this.nodes.get(layer.id)
+          if (!node) continue
+          const local = invert(this.getLayerTransform(layer.id), point)
+          const px = Math.round(local.x)
+          const py = Math.round(local.y)
+          if (px < 0 || py < 0 || px >= DOC_WIDTH || py >= DOC_HEIGHT) continue
+          const [, , , a] = node.ctx.getImageData(px, py, 1, 1).data
+          if ((a ?? 0) > 0) {
+            if (layer.id !== this.activeLayerId) this.onLayerAutoSelected?.(layer.id)
+            return
+          }
+        }
         return
       }
       this.moveStart = point
@@ -544,6 +562,12 @@ export class CanvasEngine {
   /** Subscribe to per-layer pixel changes (the chrome refreshes that layer's thumbnail). */
   setOnLayerPixelsChanged(cb: (layerId: string) => void) {
     this.onLayerPixelsChanged = cb
+  }
+
+  /** Subscribe to auto-select: fires when a Move-tool click misses the current layer and
+   *  hits a different one (top-most visible layer with a non-transparent pixel wins). */
+  setOnLayerAutoSelected(cb: (layerId: string) => void) {
+    this.onLayerAutoSelected = cb
   }
 
   /** Overwrite a layer's pixels with a snapshot (undo/redo restore). Public so the
