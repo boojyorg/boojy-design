@@ -1,5 +1,6 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef } from "react"
 import { CanvasEngine } from "@/editor/Canvas/engine/CanvasEngine"
+import { useUndoStore } from "@/editor/state/undoStore"
 import type { Layer, ToolId } from "@/editor/types"
 import { toLayerName } from "@/lib/filename"
 import { decodeImageFile } from "@/lib/loadImage"
@@ -27,29 +28,30 @@ interface CanvasStageProps {
   zoom: number
   layers: Layer[]
   activeLayerId: string
-  onHistoryChange: (s: { canUndo: boolean; canRedo: boolean }) => void
-  /** Ask the chrome to add an image-typed layer (reducer owns layer metadata). */
+  /** Ask the chrome to add an image-typed layer (the document store owns layer metadata). */
   onRequestImageLayer: (name: string) => void
 }
 
 /** The narrow imperative surface the engine exposes across the seam. */
 export interface CanvasStageHandle {
   exportPNG: () => void
-  undo: () => void
-  redo: () => void
   importImage: (file: Blob, filename: string) => void
-  /** Stash a pending pixel copy; drawn into the new layer's node after the next sync. */
-  stashDuplicate: (fromId: string, toId: string) => void
+  /** Clone a layer's current pixels (for an undoable delete/duplicate), or null if none. */
+  captureLayerPixels: (layerId: string) => HTMLCanvasElement | null
+  /** Queue a pixel snapshot to paint into a layer once its node next exists (after a sync). */
+  stashPixelRestore: (layerId: string, canvas: HTMLCanvasElement) => void
 }
 
 export const CanvasStage = forwardRef<CanvasStageHandle, CanvasStageProps>(
   function CanvasStage(props, ref) {
     const hostRef = useRef<HTMLDivElement>(null)
     const engineRef = useRef<CanvasEngine | null>(null)
+    const record = useUndoStore((s) => s.record)
     // A decoded image waiting for its layer's node to exist (drawn in the layers effect).
     const pendingImageRef = useRef<{ source: CanvasImageSource; w: number; h: number } | null>(null)
-    // A layer duplicate waiting for its new node to exist (pixels copied in the layers effect).
-    const pendingDuplicateRef = useRef<{ fromId: string; toId: string } | null>(null)
+    // Pixel snapshots waiting for their layer's node to exist, drained after the next sync.
+    // Feeds undo-delete (resurrected node) and duplicate (the copy's pixels).
+    const pendingPixelRestoresRef = useRef<{ layerId: string; canvas: HTMLCanvasElement }[]>([])
     // Latest onRequestImageLayer, read through a ref so the handle can stay stable.
     const onRequestImageLayerRef = useRef(props.onRequestImageLayer)
     onRequestImageLayerRef.current = props.onRequestImageLayer
@@ -69,13 +71,12 @@ export const CanvasStage = forwardRef<CanvasStageHandle, CanvasStageProps>(
       ref,
       () => ({
         exportPNG: () => engineRef.current?.exportPNG(),
-        undo: () => engineRef.current?.undo(),
-        redo: () => engineRef.current?.redo(),
         importImage: (file, filename) => {
           void importImage(file, filename)
         },
-        stashDuplicate: (fromId, toId) => {
-          pendingDuplicateRef.current = { fromId, toId }
+        captureLayerPixels: (layerId) => engineRef.current?.captureLayerPixels(layerId) ?? null,
+        stashPixelRestore: (layerId, canvas) => {
+          pendingPixelRestoresRef.current.push({ layerId, canvas })
         },
       }),
       [importImage],
@@ -92,6 +93,18 @@ export const CanvasStage = forwardRef<CanvasStageHandle, CanvasStageProps>(
         engineRef.current = null
       }
     }, [])
+
+    // Record each committed stroke onto the unified timeline. restorePixels no-ops if the
+    // layer has no node; timeline ordering guarantees a delete-undo resurrects it first.
+    useEffect(() => {
+      engineRef.current?.setOnStrokeCommitted((commit) => {
+        record({
+          label: "stroke",
+          undo: () => engineRef.current?.restorePixels(commit.layerId, commit.before),
+          redo: () => engineRef.current?.restorePixels(commit.layerId, commit.after),
+        })
+      })
+    }, [record])
 
     useEffect(() => {
       engineRef.current?.setBrush({
@@ -113,21 +126,18 @@ export const CanvasStage = forwardRef<CanvasStageHandle, CanvasStageProps>(
         engine.drawImageToActiveLayer(pending.source, pending.w, pending.h)
         pendingImageRef.current = null
       }
-      // The new duplicate layer's node now exists — copy the source's pixels into it.
-      const dup = pendingDuplicateRef.current
-      if (dup) {
-        engine.duplicateLayerPixels(dup.fromId, dup.toId)
-        pendingDuplicateRef.current = null
+      // Layers whose nodes now exist get their stashed pixels painted in: the copy's
+      // pixels (duplicate) or a deleted layer's pixels (undo-delete).
+      const restores = pendingPixelRestoresRef.current
+      if (restores.length) {
+        for (const { layerId, canvas } of restores) engine.restorePixels(layerId, canvas)
+        pendingPixelRestoresRef.current = []
       }
     }, [props.layers, props.activeLayerId])
 
     useEffect(() => {
       engineRef.current?.setZoom(props.zoom)
     }, [props.zoom])
-
-    useEffect(() => {
-      engineRef.current?.setOnHistoryChange(props.onHistoryChange)
-    }, [props.onHistoryChange])
 
     const isPaintTool = props.tool === "brush" || props.tool === "eraser"
 

@@ -43,10 +43,11 @@ shadcn-style Radix primitives · react-colorful · dnd-kit · Lucide · Vitest +
 ## Roadmap
 
 Shipped: the Konva canvas engine — a raster **brush + eraser** (1280×800 page, per-layer
-buffers, zoom-as-stage-scale), an editable **foreground colour** picker, **undo/redo** of
-strokes (Cmd+Z / Cmd+Shift+Z), **image import** (Open… / drag-drop / ⌘O), **PNG export**
-(Design menu or ⌘E), and **layer ops** — drag-to-reorder, inline rename, duplicate. That
-rounds out the MVP paint loop. After MVP (v0.5+):
+buffers, zoom-as-stage-scale), an editable **foreground colour** picker, **image import**
+(Open… / drag-drop / ⌘O), **PNG export** (Design menu or ⌘E), **layer ops** — drag-to-reorder,
+inline rename, duplicate, delete — and a **unified undo/redo** timeline (Cmd+Z / Cmd+Shift+Z)
+where strokes and every layer op share one history, including undo-delete with pixels intact.
+That rounds out the MVP paint loop. After MVP (v0.5+):
 Move tool + raster transforms, Text, eyedropper, blend modes. Non-MVP tools already appear in
 the rail, dimmed with a "coming in v0.5" tooltip. Sequenced, not piled on at once — the
 8-feature MVP cap is the discipline lever.

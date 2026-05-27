@@ -11,19 +11,22 @@ shell shipped and is live, and the design direction is **confirmed**, so this is
 **foundation for an actively-developed app**, not a throwaway. The Konva canvas engine has
 landed and the **MVP paint loop is in place** — paint/erase in any colour across layers
 (reorder/rename/duplicate), undo/redo, image import, PNG export — all behind the canvas seam
-(see "Engine decision" and "Roadmap" below). The document model has begun its Zustand
-graduation — the layer stack now lives in `documentStore`; next is the unified undo timeline.
+(see "Engine decision" and "Roadmap" below). The document model has graduated to a Zustand
+`documentStore`, and undo/redo is now a **unified timeline** (`undoStore`) — strokes *and*
+every layer op (incl. undo-delete with pixels) sit on one stack. Next is persistence.
 
 Two things that still shape any change:
 - **The canvas is a seam.** `src/editor/Canvas/CanvasStage.tsx` mounts the imperative Konva
   engine (`src/editor/Canvas/engine/CanvasEngine.ts`); all canvas/engine logic lives behind
   that seam — don't scatter it through the chrome.
 - **State is graduating from one reducer to Zustand stores.** The document model (layer
-  stack + active layer) now lives in `src/editor/state/documentStore.ts`; the rest — tool,
-  brush params, zoom, panel chrome — is still the local `useReducer`
-  (`src/editor/state/useEditorState.ts`). The remaining planned stores (`undoStore`, then
-  `viewportStore`) land *as* their work does (unified undo next, viewport later) — introduce
-  each with that work, not as a speculative refactor.
+  stack + active layer) lives in `src/editor/state/documentStore.ts`, and the undo timeline
+  in `src/editor/state/undoStore.ts` (a stack of `Command`s — see `commands.ts`). The rest —
+  tool, brush params, zoom, panel chrome — is still the local `useReducer`
+  (`src/editor/state/useEditorState.ts`). The one planned store left, `viewportStore` (zoom),
+  lands *as* that work does — introduce it then, not as a speculative refactor. **Both stores
+  are module singletons**, so tests reset them in `vitest.setup.ts` — any new store needs the
+  same.
 
 ## Commands
 
@@ -112,14 +115,13 @@ without a canvas mock. Keep scope MVP-disciplined (see Roadmap).
 ## Roadmap (sequence intentionally — confirm scope before starting a new item)
 
 Rough order, MVP first — **shipped:** canvas engine (Konva, brush hot path) + raster
-brush/eraser + editable foreground colour + PNG export (menu / ⌘E) + undo/redo (strokes only;
-engine-owned snapshot stack, layer ops not yet on the timeline) + image import (Open… /
-drag-drop / ⌘O, fit-centered new layer, not undoable) + layer ops (drag-reorder via dnd-kit,
-inline rename, duplicate-with-pixels; reorder is reducer-only since syncLayers restacks from
-the array; not undoable) + document model in Zustand (`documentStore` owns the layer stack;
-the shell reducer keeps tool/brush/zoom/UI). **Next:** widen undo to a unified timeline
-(`undoStore`, command pattern) so layer ops join strokes — including undo-delete (pixel
-resurrection) — then persistence. v0.5+ tools below.
+brush/eraser + editable foreground colour + PNG export (menu / ⌘E) + image import (Open… /
+drag-drop / ⌘O, fit-centered new layer; **not undoable** — adds a layer outside the timeline)
++ layer ops (drag-reorder via dnd-kit, inline rename, duplicate-with-pixels, delete) +
+document model in Zustand (`documentStore`) + **unified undo/redo** (`undoStore`, a `Command`
+stack — see `commands.ts`): strokes and every layer op share one linear timeline, including
+**undo-delete** (the deleted layer's pixels are captured and replayed). Plain layer selection
+is deliberately *not* on the timeline. **Next:** persistence. v0.5+ tools below.
 Then v0.5+: Move/transform tool, Text tool, eyedropper, blend modes, persistence/`.design`
 file format. These aren't forbidden — they're sequenced. Don't pile features onto the shell
 all at once; the **8-feature MVP cap** is the discipline lever. As a side-project this sits
