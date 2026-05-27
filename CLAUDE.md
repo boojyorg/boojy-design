@@ -52,6 +52,28 @@ CI (`.github/workflows/ci.yml`) runs lint + test + build + build-storybook, then
 to Cloudflare Pages — preview per PR, production on push to `main`. Both deploys are
 secret-guarded (skip gracefully without `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID`).
 
+## Shipping workflow
+
+Default fast path once a change is ready — keep it light, don't add ceremony:
+
+1. **Branch** (never commit straight to `main`).
+2. **Green the local gates:** `pnpm test`, `pnpm typecheck`, `pnpm lint` (+ `pnpm build` for
+   anything non-trivial). Run them yourself — the pre-commit hook (lint+typecheck) and pre-push
+   hook (test) are a backstop, not the check.
+3. **Commit, push, open a PR.**
+4. **Merge once CI is green** (squash + delete branch) — no need to ask for the merge each time.
+
+Two load-bearing rules:
+
+- **CI-green is the gate, not local `pnpm test`.** CI runs lint + test + build + build-storybook;
+  local `pnpm test` alone is weaker (a change can pass it yet fail CI on a lint/format/import-order
+  nit or a Storybook break). Wait for CI, then merge.
+- **Canvas / engine / visual features need a `pnpm dev` walkthrough *before* merge.** The engine
+  no-ops under jsdom, so automated tests cover the *pure logic* (stamp/offset/flatten/fill math,
+  persistence round-trips) but never the live drag, paint, clip, or render. Non-visual work
+  (state, chrome, persistence format, pure helpers) is fully covered by CI and can merge on green
+  without a walkthrough.
+
 ## Architecture
 
 - **`src/editor/`** — the shell, split by region: `TopBar/` (incl. `ToolProperties`, the
