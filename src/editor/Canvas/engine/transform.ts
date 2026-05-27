@@ -20,11 +20,12 @@ export interface Transform {
 
 export const IDENTITY: Transform = { x: 0, y: 0, scaleX: 1, scaleY: 1, rotation: 0 }
 
-/** Smallest scale a gesture may produce — keeps the transform invertible and prevents flipping. */
+/** Smallest scale magnitude a drag gesture may produce — keeps the transform invertible (never
+ *  exactly zero). Sign is preserved so dragging past the anchor mirrors the layer. */
 const MIN_SCALE = 0.02
-const clampScale = (v: number) => Math.max(MIN_SCALE, v)
+const clampScale = (v: number) => (v < 0 ? Math.min(-MIN_SCALE, v) : Math.max(MIN_SCALE, v))
 
-interface Box {
+export interface Box {
   x: number
   y: number
   w: number
@@ -106,12 +107,18 @@ const RESIZE_CURSORS = [
 /**
  * The CSS cursor for a handle, **remapped for the layer's rotation** so it always points the right
  * way: a 90°-rotated layer's top handle shows `ew-resize`, not `ns-resize`. Rotation is snapped to
- * the nearest 45° sector and the index shifted clockwise around the box.
+ * the nearest 45° sector and the index shifted clockwise around the box. Pass `flipped = true`
+ * (exactly one of scaleX/scaleY is negative) to swap the diagonal cursors `nesw`↔`nwse`; a
+ * double-flip (both negative) is a 180° visual rotation, which the sector shift already handles.
  */
-export function resizeCursor(handleIndex: number, rotationDeg: number): string {
+export function resizeCursor(handleIndex: number, rotationDeg: number, flipped = false): string {
   const normalized = ((rotationDeg % 360) + 360) % 360
   const sectorOffset = Math.round(normalized / 45) % 8
-  return RESIZE_CURSORS[(handleIndex + sectorOffset) % 8] ?? "default"
+  const cursor = RESIZE_CURSORS[(handleIndex + sectorOffset) % 8] ?? "default"
+  if (!flipped) return cursor
+  if (cursor === "nesw-resize") return "nwse-resize"
+  if (cursor === "nwse-resize") return "nesw-resize"
+  return cursor
 }
 
 /** Translate the transform by a document-space delta (the move gesture / arrow nudge). */
@@ -119,11 +126,42 @@ export function translateBy(t: Transform, dx: number, dy: number): Transform {
   return { ...t, x: t.x + dx, y: t.y + dy }
 }
 
+/** Flip the layer horizontally (mirror left↔right), keeping the content-box centre fixed. */
+export function flipHorizontal(t: Transform, box: Box): Transform {
+  const centre = { x: box.x + box.w / 2, y: box.y + box.h / 2 }
+  const pivotDoc = apply(t, centre)
+  const scaleX = -t.scaleX
+  const a = rotate({ x: scaleX * centre.x, y: t.scaleY * centre.y }, t.rotation)
+  return {
+    x: pivotDoc.x - a.x,
+    y: pivotDoc.y - a.y,
+    scaleX,
+    scaleY: t.scaleY,
+    rotation: t.rotation,
+  }
+}
+
+/** Flip the layer vertically (mirror top↔bottom), keeping the content-box centre fixed. */
+export function flipVertical(t: Transform, box: Box): Transform {
+  const centre = { x: box.x + box.w / 2, y: box.y + box.h / 2 }
+  const pivotDoc = apply(t, centre)
+  const scaleY = -t.scaleY
+  const a = rotate({ x: t.scaleX * centre.x, y: scaleY * centre.y }, t.rotation)
+  return {
+    x: pivotDoc.x - a.x,
+    y: pivotDoc.y - a.y,
+    scaleX: t.scaleX,
+    scaleY,
+    rotation: t.rotation,
+  }
+}
+
 /**
  * Resize by dragging handle `index` so the cursor follows it, holding the opposite handle fixed in
  * document space. `proportional` (corner default) scales both axes by one distance-ratio factor;
- * otherwise each active axis is set independently (free corner / single-axis edge). Scale is clamped
- * positive, so dragging past the anchor collapses to the minimum rather than flipping.
+ * otherwise each active axis is set independently (free corner / single-axis edge). Dragging past
+ * the anchor mirrors the layer (scaleX/scaleY go negative); scale magnitude is floored at a small
+ * epsilon so the transform stays invertible.
  */
 export function resize(
   start: Transform,
@@ -151,8 +189,12 @@ export function resize(
     const base = dist(apply(start, handleBuf), anchorDoc)
     if (base > 1e-6) {
       const f = Math.hypot(cv.x, cv.y) / base
-      scaleX = start.scaleX * f
-      scaleY = start.scaleY * f
+      // Bishop constraint: both axes share one sign derived from the diagonal projection.
+      // Negative = cursor crossed past the anchor → both axes flip together; never one alone.
+      const handleDir = sub(apply(start, handleBuf), anchorDoc)
+      const diagSign = cv.x * handleDir.x + cv.y * handleDir.y < 0 ? -1 : 1
+      scaleX = diagSign * start.scaleX * f
+      scaleY = diagSign * start.scaleY * f
     }
   } else {
     if (dBx !== 0) scaleX = (cv.x * ux.x + cv.y * ux.y) / dBx

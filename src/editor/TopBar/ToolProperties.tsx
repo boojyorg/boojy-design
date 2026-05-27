@@ -1,5 +1,7 @@
+import { FlipHorizontal2, FlipVertical2 } from "lucide-react"
 import { type ComponentProps, forwardRef, type ReactNode } from "react"
 import { ColorPopover } from "@/components/ColorPopover"
+import { IconButton } from "@/components/IconButton"
 import { NumChip } from "@/components/NumChip"
 import { Slider } from "@/components/ui/slider"
 import type { ToolId } from "@/editor/types"
@@ -16,6 +18,8 @@ interface ToolPropertiesProps {
   onOpacity: (v: number) => void
   onForeground: (color: string) => void
   onFillTolerance: (v: number) => void
+  onFlipH: () => void
+  onFlipV: () => void
 }
 
 function ToolProp({ label, children }: { label: string; children: ReactNode }) {
@@ -86,6 +90,8 @@ export function ToolProperties({
   onOpacity,
   onForeground,
   onFillTolerance,
+  onFlipH,
+  onFlipV,
 }: ToolPropertiesProps) {
   if (tool === "brush" || tool === "eraser") {
     return (
@@ -154,14 +160,25 @@ export function ToolProperties({
     )
   }
 
+  if (tool === "select") {
+    return (
+      <div className="flex items-center gap-1" data-testid="tool-props">
+        <IconButton aria-label="Flip horizontal" onClick={onFlipH}>
+          <FlipHorizontal2 size={16} />
+        </IconButton>
+        <IconButton aria-label="Flip vertical" onClick={onFlipV}>
+          <FlipVertical2 size={16} />
+        </IconButton>
+      </div>
+    )
+  }
+
   const hint =
-    tool === "select"
-      ? "Drag a layer to move it · arrow keys nudge"
-      : tool === "hand"
-        ? "Drag to pan · scroll to zoom"
-        : tool === "eyedropper"
-          ? "Click the canvas to pick a colour"
-          : "Text tool — coming in v0.5"
+    tool === "hand"
+      ? "Drag to pan · scroll to zoom"
+      : tool === "eyedropper"
+        ? "Click the canvas to pick a colour"
+        : "Text tool — coming in v0.5"
 
   return (
     <span className="text-fg-faint text-xs italic" data-testid="tool-props">

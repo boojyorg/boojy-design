@@ -48,15 +48,24 @@ export function LeftRail({
                 aria-label={label}
                 aria-pressed={active}
                 aria-disabled={tool.mvp ? undefined : true}
+                onPointerDown={(e) => {
+                  // Fire on pointer-down so the highlight commits before Radix Tooltip
+                  // processes its own pointer events (which can force an intermediate render).
+                  if (e.button === 0 && tool.mvp) onSelectTool(tool.id)
+                }}
                 onClick={() => {
+                  // Keyboard path (Enter/Space fires click without pointer-down).
                   if (tool.mvp) onSelectTool(tool.id)
                 }}
                 className={cn(
                   // No colour transition: the active highlight must land the instant you click,
                   // not fade in over ~150ms (which reads as lag). Hover snaps too — fine for a rail.
                   "flex size-11 items-center justify-center rounded-[9px]",
-                  active ? "bg-accent-dim text-accent" : "text-fg-dim",
-                  tool.mvp ? "hover:bg-elevated hover:text-fg" : "cursor-not-allowed opacity-40",
+                  active
+                    ? "bg-accent-dim text-accent"
+                    : tool.mvp
+                      ? "text-fg-dim hover:bg-elevated hover:text-fg"
+                      : "text-fg-dim cursor-not-allowed opacity-40",
                 )}
               >
                 <Icon size={21} strokeWidth={1.6} />

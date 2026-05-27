@@ -16,6 +16,8 @@ import { type Bounds, contentBounds } from "@/editor/Canvas/engine/thumbnail"
 import {
   apply,
   boxCorners,
+  flipHorizontal,
+  flipVertical,
   HANDLES,
   IDENTITY,
   invert,
@@ -449,6 +451,19 @@ export class CanvasEngine {
     if (!node?.image.visible()) return
     const before = this.getLayerTransform(this.activeLayerId)
     const after = translateBy(before, dx, dy)
+    this.setLayerTransform(this.activeLayerId, after)
+    this.onMoveCommitted?.({ layerId: this.activeLayerId, before, after })
+  }
+
+  /** Flip the active layer along the given axis and commit as one undoable step. */
+  flipActiveLayer(axis: "h" | "v") {
+    if (!this.stage) return
+    const node = this.nodes.get(this.activeLayerId)
+    if (!node?.image.visible()) return
+    const box = this.activeContentBox()
+    if (!box) return
+    const before = this.getLayerTransform(this.activeLayerId)
+    const after = axis === "h" ? flipHorizontal(before, box) : flipVertical(before, box)
     this.setLayerTransform(this.activeLayerId, after)
     this.onMoveCommitted?.({ layerId: this.activeLayerId, before, after })
   }
@@ -912,13 +927,15 @@ export class CanvasEngine {
     return null
   }
 
-  /** The CSS cursor for a gesture under the cursor — rotation-aware for resize handles. */
+  /** The CSS cursor for a gesture under the cursor — rotation- and flip-aware for resize handles. */
   private cursorFor(g: Gesture | null): string {
     if (!g) return "default"
     if (g.kind === "rotate") return "grab"
     if (g.kind === "move") return "move"
-    const deg = (this.getLayerTransform(this.activeLayerId).rotation * 180) / Math.PI
-    return resizeCursor(g.index, deg)
+    const t = this.getLayerTransform(this.activeLayerId)
+    const deg = (t.rotation * 180) / Math.PI
+    const flipped = t.scaleX < 0 !== t.scaleY < 0
+    return resizeCursor(g.index, deg, flipped)
   }
 
   /** Update the container cursor on hover — only while Move is active and not mid-drag. */

@@ -17,6 +17,8 @@ const meta = {
     onOpacity: noop,
     onForeground: noop,
     onFillTolerance: noop,
+    onFlipH: noop,
+    onFlipV: noop,
   },
   decorators: [(Story) => <div className="flex h-13 items-center bg-chrome px-4">{Story()}</div>],
 } satisfies Meta<typeof ToolProperties>
@@ -26,6 +28,7 @@ type Story = StoryObj<typeof meta>
 
 export const Brush: Story = { args: { tool: "brush" } }
 export const Eraser: Story = { args: { tool: "eraser" } }
+export const Select: Story = { args: { tool: "select" } }
 export const Fill: Story = { args: { tool: "fill" } }
 export const Shape: Story = { args: { tool: "shape" } }
 export const Hand: Story = { args: { tool: "hand" } }
