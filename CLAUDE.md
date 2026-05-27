@@ -11,16 +11,19 @@ shell shipped and is live, and the design direction is **confirmed**, so this is
 **foundation for an actively-developed app**, not a throwaway. The Konva canvas engine has
 landed and the **MVP paint loop is in place** — paint/erase in any colour across layers
 (reorder/rename/duplicate), undo/redo, image import, PNG export — all behind the canvas seam
-(see "Engine decision" and "Roadmap" below). Next is the document model + Zustand graduation.
+(see "Engine decision" and "Roadmap" below). The document model has begun its Zustand
+graduation — the layer stack now lives in `documentStore`; next is the unified undo timeline.
 
 Two things that still shape any change:
 - **The canvas is a seam.** `src/editor/Canvas/CanvasStage.tsx` mounts the imperative Konva
   engine (`src/editor/Canvas/engine/CanvasEngine.ts`); all canvas/engine logic lives behind
   that seam — don't scatter it through the chrome.
-- **State is a local reducer for now.** All editor state is one `useReducer`
-  (`src/editor/state/useEditorState.ts`). It graduates to the planned Zustand stores
-  (document / undo / viewport) *as* engine + document state lands — introduce those with
-  that work, not as a speculative refactor of the current shell.
+- **State is graduating from one reducer to Zustand stores.** The document model (layer
+  stack + active layer) now lives in `src/editor/state/documentStore.ts`; the rest — tool,
+  brush params, zoom, panel chrome — is still the local `useReducer`
+  (`src/editor/state/useEditorState.ts`). The remaining planned stores (`undoStore`, then
+  `viewportStore`) land *as* their work does (unified undo next, viewport later) — introduce
+  each with that work, not as a speculative refactor.
 
 ## Commands
 
@@ -113,8 +116,10 @@ brush/eraser + editable foreground colour + PNG export (menu / ⌘E) + undo/redo
 engine-owned snapshot stack, layer ops not yet on the timeline) + image import (Open… /
 drag-drop / ⌘O, fit-centered new layer, not undoable) + layer ops (drag-reorder via dnd-kit,
 inline rename, duplicate-with-pixels; reorder is reducer-only since syncLayers restacks from
-the array; not undoable). **Next:** the document/layer model + Zustand stores (undo widens to
-a unified timeline then), then persistence. v0.5+ tools below.
+the array; not undoable) + document model in Zustand (`documentStore` owns the layer stack;
+the shell reducer keeps tool/brush/zoom/UI). **Next:** widen undo to a unified timeline
+(`undoStore`, command pattern) so layer ops join strokes — including undo-delete (pixel
+resurrection) — then persistence. v0.5+ tools below.
 Then v0.5+: Move/transform tool, Text tool, eyedropper, blend modes, persistence/`.design`
 file format. These aren't forbidden — they're sequenced. Don't pile features onto the shell
 all at once; the **8-feature MVP cap** is the discipline lever. As a side-project this sits

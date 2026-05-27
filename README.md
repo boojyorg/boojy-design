@@ -7,8 +7,9 @@ rail, canvas, and collapsible right sidebar.
 > direction is confirmed. The Konva canvas engine has now landed: a raster **brush and
 > eraser** paint real pixels on a 1280×800 page in **any colour**, with **undo/redo**,
 > **image import** (open or drag-drop) and **PNG export** — all behind a clean seam
-> (`src/editor/Canvas/CanvasStage.tsx` → `src/editor/Canvas/engine/`). State is a local
-> reducer for now and graduates to Zustand as the full document model lands.
+> (`src/editor/Canvas/CanvasStage.tsx` → `src/editor/Canvas/engine/`). The document model
+> (layers) now lives in a Zustand `documentStore`; the rest of the shell state is still a
+> local reducer, graduating store by store as each piece of work lands.
 
 ## Stack
 
@@ -34,7 +35,8 @@ shadcn-style Radix primitives · react-colorful · dnd-kit · Lucide · Vitest +
 
 - `src/editor/` — the editor, by region (`TopBar/`, `LeftRail/`, `Canvas/`, `RightSidebar/`).
 - `src/editor/Canvas/engine/` — the imperative Konva engine behind the canvas seam (brush/eraser, per-layer pixel buffers, viewport math).
-- `src/editor/state/useEditorState.ts` — local reducer (graduates to Zustand with the document model).
+- `src/editor/state/documentStore.ts` — Zustand store for the document model (layer stack + active layer).
+- `src/editor/state/useEditorState.ts` — local reducer for the rest of the shell (tool, brush, zoom, panel chrome).
 - `src/components/` — reusable primitives (+ `ui/` shadcn-style Radix wrappers).
 - `src/theme/base.tokens.css` — shared Boojy tokens; `accent.design.css` — the per-product amber (the single swap point for other Boojy products).
 

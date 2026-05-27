@@ -1,4 +1,11 @@
 import "@testing-library/jest-dom/vitest"
+import { beforeEach } from "vitest"
+import { initialDocumentState, useDocumentStore } from "@/editor/state/documentStore"
+
+// documentStore is a module singleton, so its state would otherwise leak between
+// tests (the old per-render useReducer reset for free). Restore fresh document
+// state before every dom test to keep them isolated.
+beforeEach(() => useDocumentStore.setState(initialDocumentState()))
 
 // jsdom lacks several browser APIs that Radix primitives depend on.
 class ResizeObserverStub {

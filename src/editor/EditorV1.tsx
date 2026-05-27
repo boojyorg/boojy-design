@@ -3,6 +3,7 @@ import { TooltipProvider } from "@/components/ui/tooltip"
 import { CanvasStage, type CanvasStageHandle } from "@/editor/Canvas/CanvasStage"
 import { LeftRail } from "@/editor/LeftRail/LeftRail"
 import { RightSidebar } from "@/editor/RightSidebar/RightSidebar"
+import { useDocumentStore } from "@/editor/state/documentStore"
 import { newLayerId } from "@/editor/state/ids"
 import { useEditorState } from "@/editor/state/useEditorState"
 import { TopBar } from "@/editor/TopBar/TopBar"
@@ -11,6 +12,15 @@ import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts"
 /** V1 "Classic" — the chosen direction. Three-region layout, mock-interactive. */
 export function EditorV1() {
   const [state, dispatch] = useEditorState()
+  const layers = useDocumentStore((s) => s.layers)
+  const activeLayerId = useDocumentStore((s) => s.activeLayerId)
+  const selectLayer = useDocumentStore((s) => s.selectLayer)
+  const toggleLayer = useDocumentStore((s) => s.toggleLayer)
+  const addLayer = useDocumentStore((s) => s.addLayer)
+  const deleteActiveLayer = useDocumentStore((s) => s.deleteActiveLayer)
+  const renameLayer = useDocumentStore((s) => s.renameLayer)
+  const moveLayer = useDocumentStore((s) => s.moveLayer)
+  const duplicateLayer = useDocumentStore((s) => s.duplicateLayer)
   const stageRef = useRef<CanvasStageHandle>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [history, setHistory] = useState({ canUndo: false, canRedo: false })
@@ -29,9 +39,9 @@ export function EditorV1() {
       // adds the layer (stash first, then dispatch — same ordering as image import).
       const dupId = newLayerId()
       stageRef.current?.stashDuplicate(id, dupId)
-      dispatch({ type: "duplicateLayer", id, newId: dupId })
+      duplicateLayer(id, dupId)
     },
-    [dispatch],
+    [duplicateLayer],
   )
   useKeyboardShortcuts(dispatch, { onExport, onUndo, onRedo, onOpen })
 
@@ -83,22 +93,22 @@ export function EditorV1() {
             opacity={state.opacity}
             foreground={state.foreground}
             zoom={state.zoom}
-            layers={state.layers}
-            activeLayerId={state.activeLayerId}
+            layers={layers}
+            activeLayerId={activeLayerId}
             onHistoryChange={setHistory}
-            onRequestImageLayer={(name) => dispatch({ type: "addLayer", name, layerType: "image" })}
+            onRequestImageLayer={(name) => addLayer(name, "image")}
           />
           <RightSidebar
             collapsed={state.rightCollapsed}
-            layers={state.layers}
-            activeLayerId={state.activeLayerId}
-            onSelectLayer={(id) => dispatch({ type: "selectLayer", id })}
-            onToggleLayer={(id) => dispatch({ type: "toggleLayer", id })}
-            onAddLayer={() => dispatch({ type: "addLayer" })}
-            onDeleteLayer={() => dispatch({ type: "deleteActiveLayer" })}
-            onRenameLayer={(id, name) => dispatch({ type: "renameLayer", id, name })}
+            layers={layers}
+            activeLayerId={activeLayerId}
+            onSelectLayer={(id) => selectLayer(id)}
+            onToggleLayer={(id) => toggleLayer(id)}
+            onAddLayer={() => addLayer()}
+            onDeleteLayer={() => deleteActiveLayer()}
+            onRenameLayer={(id, name) => renameLayer(id, name)}
             onDuplicateLayer={onDuplicateLayer}
-            onMoveLayer={(id, toIndex) => dispatch({ type: "moveLayer", id, toIndex })}
+            onMoveLayer={(id, toIndex) => moveLayer(id, toIndex)}
           />
         </div>
       </div>

@@ -39,7 +39,8 @@
     "react": "^19.2.6",
     "react-colorful": "^5.7.0",
     "react-dom": "^19.2.6",
-    "tailwind-merge": "^3.6.0"
+    "tailwind-merge": "^3.6.0",
+    "zustand": "^5.0.13"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.15",
