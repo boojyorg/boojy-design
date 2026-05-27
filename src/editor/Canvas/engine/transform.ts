@@ -20,12 +20,12 @@ export interface Transform {
 
 export const IDENTITY: Transform = { x: 0, y: 0, scaleX: 1, scaleY: 1, rotation: 0 }
 
-/** Smallest scale a drag gesture may produce — keeps the transform invertible. Flip is done
- *  explicitly via {@link flipHorizontal}/{@link flipVertical}, not by dragging through zero. */
+/** Smallest scale magnitude a drag gesture may produce — keeps the transform invertible (never
+ *  exactly zero). Sign is preserved so dragging past the anchor mirrors the layer. */
 const MIN_SCALE = 0.02
-const clampScale = (v: number) => Math.max(MIN_SCALE, v)
+const clampScale = (v: number) => (v < 0 ? Math.min(-MIN_SCALE, v) : Math.max(MIN_SCALE, v))
 
-interface Box {
+export interface Box {
   x: number
   y: number
   w: number
@@ -120,21 +120,42 @@ export function translateBy(t: Transform, dx: number, dy: number): Transform {
   return { ...t, x: t.x + dx, y: t.y + dy }
 }
 
-/** Flip the layer horizontally (mirror left↔right) by negating scaleX. */
-export function flipHorizontal(t: Transform): Transform {
-  return { ...t, scaleX: -t.scaleX }
+/** Flip the layer horizontally (mirror left↔right), keeping the content-box centre fixed. */
+export function flipHorizontal(t: Transform, box: Box): Transform {
+  const centre = { x: box.x + box.w / 2, y: box.y + box.h / 2 }
+  const pivotDoc = apply(t, centre)
+  const scaleX = -t.scaleX
+  const a = rotate({ x: scaleX * centre.x, y: t.scaleY * centre.y }, t.rotation)
+  return {
+    x: pivotDoc.x - a.x,
+    y: pivotDoc.y - a.y,
+    scaleX,
+    scaleY: t.scaleY,
+    rotation: t.rotation,
+  }
 }
 
-/** Flip the layer vertically (mirror top↔bottom) by negating scaleY. */
-export function flipVertical(t: Transform): Transform {
-  return { ...t, scaleY: -t.scaleY }
+/** Flip the layer vertically (mirror top↔bottom), keeping the content-box centre fixed. */
+export function flipVertical(t: Transform, box: Box): Transform {
+  const centre = { x: box.x + box.w / 2, y: box.y + box.h / 2 }
+  const pivotDoc = apply(t, centre)
+  const scaleY = -t.scaleY
+  const a = rotate({ x: t.scaleX * centre.x, y: scaleY * centre.y }, t.rotation)
+  return {
+    x: pivotDoc.x - a.x,
+    y: pivotDoc.y - a.y,
+    scaleX: t.scaleX,
+    scaleY,
+    rotation: t.rotation,
+  }
 }
 
 /**
  * Resize by dragging handle `index` so the cursor follows it, holding the opposite handle fixed in
  * document space. `proportional` (corner default) scales both axes by one distance-ratio factor;
- * otherwise each active axis is set independently (free corner / single-axis edge). Scale is clamped
- * positive, so dragging past the anchor collapses to the minimum rather than flipping.
+ * otherwise each active axis is set independently (free corner / single-axis edge). Dragging past
+ * the anchor mirrors the layer (scaleX/scaleY go negative); scale magnitude is floored at a small
+ * epsilon so the transform stays invertible.
  */
 export function resize(
   start: Transform,
@@ -162,8 +183,13 @@ export function resize(
     const base = dist(apply(start, handleBuf), anchorDoc)
     if (base > 1e-6) {
       const f = Math.hypot(cv.x, cv.y) / base
-      scaleX = start.scaleX * f
-      scaleY = start.scaleY * f
+      // Derive per-axis sign from the signed projection so dragging past the anchor flips the axis.
+      const tx = (cv.x * ux.x + cv.y * ux.y) / dBx
+      const ty = (cv.x * uy.x + cv.y * uy.y) / dBy
+      const sx = tx < 0 ? -1 : 1
+      const sy = ty < 0 ? -1 : 1
+      scaleX = sx * Math.abs(start.scaleX) * f
+      scaleY = sy * Math.abs(start.scaleY) * f
     }
   } else {
     if (dBx !== 0) scaleX = (cv.x * ux.x + cv.y * ux.y) / dBx

@@ -460,8 +460,10 @@ export class CanvasEngine {
     if (!this.stage) return
     const node = this.nodes.get(this.activeLayerId)
     if (!node?.image.visible()) return
+    const box = this.activeContentBox()
+    if (!box) return
     const before = this.getLayerTransform(this.activeLayerId)
-    const after = axis === "h" ? flipHorizontal(before) : flipVertical(before)
+    const after = axis === "h" ? flipHorizontal(before, box) : flipVertical(before, box)
     this.setLayerTransform(this.activeLayerId, after)
     this.onMoveCommitted?.({ layerId: this.activeLayerId, before, after })
   }

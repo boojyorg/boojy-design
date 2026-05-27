@@ -21,8 +21,8 @@ collapsible right sidebar.
 - **Shapes** — drag a filled rectangle or ellipse onto the active layer (Shift → square/circle).
 - **Move / transform** — a non-destructive 8-handle free transform: proportional corners (Shift =
   free), single-axis edges, a rotate grip (15° snap), drag-inside to move; rotation-aware cursors and
-  arrow-key nudges. **Flip H / Flip V** buttons in the top bar mirror the layer non-destructively.
-  Pixels never leave their buffer.
+  arrow-key nudges. Drag any handle **past the opposite edge to mirror** the layer; **Flip H / Flip V**
+  buttons in the top bar mirror in place about the content centre. Pixels never leave their buffer.
 - **Layers** — add, reorder (drag), rename, duplicate (with pixels), delete, toggle visibility, with
   a live thumbnail per layer. Every document opens with a locked white **Background** layer pinned
   at the bottom (recolour it by filling it; it saves/exports like any layer).

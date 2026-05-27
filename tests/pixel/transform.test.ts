@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest"
 import {
   apply,
   boxCorners,
+  flipHorizontal,
+  flipVertical,
   IDENTITY,
   invert,
   resize,
@@ -55,9 +57,22 @@ describe("resize", () => {
     expect(near(next.scaleY, 1.5)).toBe(true)
   })
 
-  it("clamps to a positive minimum instead of flipping when dragged past the anchor", () => {
+  it("mirrors (negative scale) when dragged past the anchor, anchored at the opposite edge", () => {
+    // Right edge (index 2), drag the cursor past the left edge (anchor): scaleX goes negative.
     const next = resize(IDENTITY, BOX, 2, { x: -50, y: 50 }, { proportional: false })
-    expect(next.scaleX).toBeGreaterThan(0)
+    expect(next.scaleX).toBeLessThan(0)
+    // Left anchor (x=0) must stay fixed in doc space.
+    expect(near(apply(next, { x: 0, y: 50 }).x, 0)).toBe(true)
+  })
+
+  it("corner proportional mirrors when dragged diagonally past the anchor, keeping sign per axis", () => {
+    // BR corner (index 3), anchor TL (0,0); drag cursor to (-200, -200) → both axes flip.
+    const next = resize(IDENTITY, BOX, 3, { x: -200, y: -200 }, { proportional: true })
+    expect(next.scaleX).toBeLessThan(0)
+    expect(next.scaleY).toBeLessThan(0)
+    // Anchor (TL, buffer 0,0) stays fixed.
+    expect(near(apply(next, { x: 0, y: 0 }).x, 0)).toBe(true)
+    expect(near(apply(next, { x: 0, y: 0 }).y, 0)).toBe(true)
   })
 })
 
@@ -98,5 +113,50 @@ describe("boxCorners", () => {
       { x: 100, y: 100 },
       { x: 0, y: 100 },
     ])
+  })
+})
+
+describe("flipHorizontal / flipVertical", () => {
+  const centre = { x: BOX.x + BOX.w / 2, y: BOX.y + BOX.h / 2 } // {50, 50}
+
+  it("flipHorizontal: content-box centre stays in place, scaleX negates", () => {
+    const t: Transform = { x: 200, y: 100, scaleX: 1, scaleY: 1, rotation: 0 }
+    const before = apply(t, centre)
+    const after = flipHorizontal(t, BOX)
+    const afterPt = apply(after, centre)
+    expect(near(afterPt.x, before.x)).toBe(true)
+    expect(near(afterPt.y, before.y)).toBe(true)
+    expect(after.scaleX).toBe(-t.scaleX)
+    expect(after.scaleY).toBe(t.scaleY)
+  })
+
+  it("flipVertical: content-box centre stays in place, scaleY negates", () => {
+    const t: Transform = { x: 200, y: 100, scaleX: 1, scaleY: 1, rotation: 0 }
+    const before = apply(t, centre)
+    const after = flipVertical(t, BOX)
+    const afterPt = apply(after, centre)
+    expect(near(afterPt.x, before.x)).toBe(true)
+    expect(near(afterPt.y, before.y)).toBe(true)
+    expect(after.scaleX).toBe(t.scaleX)
+    expect(after.scaleY).toBe(-t.scaleY)
+  })
+
+  it("flipHorizontal: centre-invariant even with non-trivial translation, scale, and rotation", () => {
+    const t: Transform = { x: -40, y: 15, scaleX: 1.7, scaleY: 0.6, rotation: 0.9 }
+    const before = apply(t, centre)
+    const after = flipHorizontal(t, BOX)
+    const afterPt = apply(after, centre)
+    expect(near(afterPt.x, before.x)).toBe(true)
+    expect(near(afterPt.y, before.y)).toBe(true)
+  })
+
+  it("double flip restores the original transform", () => {
+    const t: Transform = { x: 300, y: 80, scaleX: 2, scaleY: 0.5, rotation: 0.3 }
+    const once = flipHorizontal(t, BOX)
+    const twice = flipHorizontal(once, BOX)
+    expect(near(twice.x, t.x)).toBe(true)
+    expect(near(twice.y, t.y)).toBe(true)
+    expect(near(twice.scaleX, t.scaleX)).toBe(true)
+    expect(near(twice.scaleY, t.scaleY)).toBe(true)
   })
 })
