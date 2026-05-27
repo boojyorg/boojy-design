@@ -17,8 +17,10 @@ op (incl. undo-delete with pixels) on one stack — documents **save/open** as `
 files (`src/lib/designFile.ts`), the **Shape tool** draws filled rect/ellipse (drag to
 size, Shift = square/circle) onto the active layer, the **Move tool** is a **free transform** —
 non-destructive move + scale + rotate (an 8-handle box) via a per-layer engine transform (pixels
-never leave the buffer) — and the **Layers panel shows live pixel thumbnails** per layer (fed by an
-engine `onLayerPixelsChanged` signal → `thumbnailStore`). Next are the remaining v0.5 tools.
+never leave the buffer) — the **Layers panel shows live pixel thumbnails** per layer (fed by an
+engine `onLayerPixelsChanged` signal → `thumbnailStore`), and **canvas navigation** (pan +
+zoom-to-cursor) lives in `viewportStore`. The app is tagged **v0.1.0** — the first release (see
+`CHANGELOG.md`). Next: the remaining v0.5 tools.
 
 Two things that still shape any change:
 - **The canvas is a seam.** `src/editor/Canvas/CanvasStage.tsx` mounts the imperative Konva
@@ -134,7 +136,11 @@ Two load-bearing rules:
   (a new engine capability, a removed stub, a sequencing change), update `README.md` and
   this `CLAUDE.md` in the *same* change — don't let them drift from the code. The most
   stale-prone bits are the "What this is" / "Engine decision" / "Roadmap" sections here and
-  the README's status + roadmap.
+  the README's status + roadmap. A **shippable release** also bumps `version` in `package.json`
+  and adds a `CHANGELOG.md` entry (Keep a Changelog format).
+- **App version.** Surfaced in the Design menu via `__APP_VERSION__` — a Vite `define`
+  (`vite.config.ts`) read from `package.json`, the single source of truth (bump there; the UI
+  follows). It's **distinct** from the `.design` *file-format* version (`designFile.ts` `VERSION`).
 
 ## Engine decision (resolved)
 

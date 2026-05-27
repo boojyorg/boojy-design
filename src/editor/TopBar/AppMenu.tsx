@@ -59,6 +59,7 @@ export function AppMenu({ onOpen, onSave, onImportImage, onExport }: AppMenuProp
         </DropdownMenuItem>
         <DropdownMenuItem>
           <span>About Boojy Design</span>
+          <span className="font-mono text-[11px] text-fg-faint">v{__APP_VERSION__}</span>
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
