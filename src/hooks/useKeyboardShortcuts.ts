@@ -28,6 +28,10 @@ export function useKeyboardShortcuts(
     onZoomOut?: () => void
     onZoomFit?: () => void
     onZoom100?: () => void
+    onCopy?: () => void
+    onCut?: () => void
+    onPaste?: () => void
+    onDelete?: () => void
   },
 ) {
   const onExport = opts?.onExport
@@ -39,6 +43,10 @@ export function useKeyboardShortcuts(
   const onZoomOut = opts?.onZoomOut
   const onZoomFit = opts?.onZoomFit
   const onZoom100 = opts?.onZoom100
+  const onCopy = opts?.onCopy
+  const onCut = opts?.onCut
+  const onPaste = opts?.onPaste
+  const onDelete = opts?.onDelete
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
       // Ignore everything while typing, so e.g. ⌘Z in the filename/hex field does
@@ -89,6 +97,21 @@ export function useKeyboardShortcuts(
           onZoom100?.()
           return
         }
+        if (key === "c" && !e.shiftKey) {
+          e.preventDefault()
+          onCopy?.()
+          return
+        }
+        if (key === "x" && !e.shiftKey) {
+          e.preventDefault()
+          onCut?.()
+          return
+        }
+        if (key === "v" && !e.shiftKey) {
+          e.preventDefault()
+          onPaste?.()
+          return
+        }
       }
 
       if (e.metaKey || e.ctrlKey || e.altKey) return
@@ -105,6 +128,11 @@ export function useKeyboardShortcuts(
       }
       if (key === "d") {
         dispatch({ type: "resetColors" })
+        return
+      }
+
+      if (e.key === "Delete" || e.key === "Backspace") {
+        onDelete?.()
         return
       }
 
@@ -139,5 +167,9 @@ export function useKeyboardShortcuts(
     onZoomOut,
     onZoomFit,
     onZoom100,
+    onCopy,
+    onCut,
+    onPaste,
+    onDelete,
   ])
 }

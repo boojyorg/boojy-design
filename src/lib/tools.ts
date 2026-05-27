@@ -1,4 +1,5 @@
 import {
+  BoxSelect,
   Brush,
   Eraser,
   Hand,
@@ -23,6 +24,7 @@ export interface ToolDef {
 /** Left-rail tool order. Text is v0.5 (dimmed); the rest are MVP. */
 export const TOOLS: ToolDef[] = [
   { id: "select", label: "Move", shortcut: "V", icon: MousePointer2, mvp: true },
+  { id: "marquee", label: "Marquee", shortcut: "M", icon: BoxSelect, mvp: true },
   { id: "brush", label: "Paint", shortcut: "B", icon: Brush, mvp: true },
   { id: "eraser", label: "Eraser", shortcut: "E", icon: Eraser, mvp: true },
   { id: "fill", label: "Fill", shortcut: "G", icon: PaintBucket, mvp: true },

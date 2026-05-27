@@ -1,5 +1,6 @@
 export type ToolId =
   | "select"
+  | "marquee"
   | "brush"
   | "eraser"
   | "fill"
