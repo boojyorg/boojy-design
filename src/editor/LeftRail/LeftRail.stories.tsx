@@ -8,11 +8,11 @@ const meta = {
   args: {
     activeTool: "brush",
     foreground: "#E89940",
-    background: "#FFFFFF",
+    secondaryColor: "#FFFFFF",
     shapeKind: "rect",
     onSelectTool: () => {},
     onForeground: () => {},
-    onBackground: () => {},
+    onSecondaryColor: () => {},
     onSwapColors: () => {},
   },
   decorators: [

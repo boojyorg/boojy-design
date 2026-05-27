@@ -19,6 +19,8 @@ interface SerializedLayer {
   visible: boolean
   opacity: number
   kind?: VectorKind
+  /** Marks the pinned document background layer. Optional → legacy files have none. */
+  background?: boolean
   /** data: URL PNG of the layer's pixels, or null if it had none (or couldn't be read). */
   pixels: string | null
   /** Non-destructive transform; omitted when identity. */
@@ -82,6 +84,7 @@ export function serializeDesign(
       visible: l.visible,
       opacity: l.opacity,
       ...(l.kind ? { kind: l.kind } : {}),
+      ...(l.background ? { background: true } : {}),
       ...(isIdentity(t) ? {} : { transform: t }),
       pixels: getPixels(l.id)?.toDataURL("image/png") ?? null,
     }
@@ -110,6 +113,7 @@ export function parseDesign(json: string): ParsedDesign {
     visible: l.visible,
     opacity: l.opacity,
     ...(l.kind ? { kind: l.kind } : {}),
+    ...(l.background ? { background: true } : {}),
   }))
   const pixels = data.layers
     .filter((l): l is SerializedLayer & { pixels: string } => typeof l.pixels === "string")

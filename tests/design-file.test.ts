@@ -33,6 +33,27 @@ describe("serializeDesign / parseDesign", () => {
     ])
   })
 
+  it("round-trips the pinned background flag", () => {
+    const withBg: DocumentSnapshot = {
+      layers: [
+        { id: "l1", name: "Layer 1", type: "raster", visible: true, opacity: 100 },
+        {
+          id: "bg",
+          name: "Background",
+          type: "raster",
+          visible: true,
+          opacity: 100,
+          background: true,
+        },
+      ],
+      activeLayerId: "l1",
+      nextLayerNum: 2,
+    }
+    const parsed = parseDesign(serializeDesign(withBg, fakePixels(null), SIZE))
+    expect(parsed.snapshot.layers).toEqual(withBg.layers)
+    expect(parsed.snapshot.layers.find((l) => l.id === "bg")?.background).toBe(true)
+  })
+
   it("round-trips per-layer transforms and skips identity layers", () => {
     const t = { x: 40, y: -15, scaleX: 1.5, scaleY: 0.8, rotation: 0.3 }
     const getTransform = (id: string) =>

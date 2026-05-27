@@ -12,7 +12,7 @@ import {
   useSortable,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable"
-import { Copy, Eye, EyeOff, GripVertical, Plus, Trash2 } from "lucide-react"
+import { Copy, Eye, EyeOff, GripVertical, Lock, Plus, Trash2 } from "lucide-react"
 import { type CSSProperties, useRef, useState } from "react"
 import { PanelHead } from "@/components/PanelHead"
 import { LayerThumb } from "@/editor/LayerThumb"
@@ -38,6 +38,8 @@ interface RowProps {
   layer: Layer
   active: boolean
   editing: boolean
+  /** The pinned background layer: no drag / visibility / opacity controls, shown with a lock. */
+  pinned: boolean
   onSelect: (id: string) => void
   onToggle: (id: string) => void
   onStartEdit: (id: string) => void
@@ -49,6 +51,7 @@ function SortableLayerRow({
   layer,
   active,
   editing,
+  pinned,
   onSelect,
   onToggle,
   onStartEdit,
@@ -57,6 +60,7 @@ function SortableLayerRow({
 }: RowProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: layer.id,
+    disabled: pinned,
   })
   const style: CSSProperties = {
     transform: transform ? `translate3d(0, ${transform.y}px, 0)` : undefined,
@@ -87,31 +91,39 @@ function SortableLayerRow({
           active ? "border-accent bg-accent-dim" : "border-transparent hover:bg-elevated",
         )}
       >
-        <button
-          type="button"
-          aria-label={`Reorder ${layer.name}`}
-          className="flex cursor-grab touch-none text-fg-faint hover:text-fg-dim"
-          {...attributes}
-          {...listeners}
-          onClick={(e) => e.stopPropagation()}
-          onDoubleClick={(e) => e.stopPropagation()}
-        >
-          <GripVertical size={14} />
-        </button>
+        {pinned ? (
+          <span aria-hidden title="Background layer (locked)" className="flex p-0.5 text-fg-faint">
+            <Lock size={13} />
+          </span>
+        ) : (
+          <button
+            type="button"
+            aria-label={`Reorder ${layer.name}`}
+            className="flex cursor-grab touch-none text-fg-faint hover:text-fg-dim"
+            {...attributes}
+            {...listeners}
+            onClick={(e) => e.stopPropagation()}
+            onDoubleClick={(e) => e.stopPropagation()}
+          >
+            <GripVertical size={14} />
+          </button>
+        )}
 
-        <button
-          type="button"
-          aria-label={layer.visible ? `Hide ${layer.name}` : `Show ${layer.name}`}
-          aria-pressed={layer.visible}
-          onClick={(e) => {
-            e.stopPropagation()
-            onToggle(layer.id)
-          }}
-          onDoubleClick={(e) => e.stopPropagation()}
-          className={cn("flex p-0.5", layer.visible ? "text-fg" : "text-fg-faint")}
-        >
-          {layer.visible ? <Eye size={16} /> : <EyeOff size={16} />}
-        </button>
+        {!pinned && (
+          <button
+            type="button"
+            aria-label={layer.visible ? `Hide ${layer.name}` : `Show ${layer.name}`}
+            aria-pressed={layer.visible}
+            onClick={(e) => {
+              e.stopPropagation()
+              onToggle(layer.id)
+            }}
+            onDoubleClick={(e) => e.stopPropagation()}
+            className={cn("flex p-0.5", layer.visible ? "text-fg" : "text-fg-faint")}
+          >
+            {layer.visible ? <Eye size={16} /> : <EyeOff size={16} />}
+          </button>
+        )}
 
         <div className="flex h-7 w-9 shrink-0 items-center justify-center overflow-hidden rounded border border-divider bg-panel">
           <LayerThumb layer={layer} />
@@ -144,7 +156,7 @@ function SortableLayerRow({
           </span>
         )}
 
-        {layer.opacity < 100 && (
+        {!pinned && layer.opacity < 100 && (
           <span className="font-mono text-[11px] text-fg-faint">{layer.opacity}</span>
         )}
       </div>
@@ -181,6 +193,9 @@ export function LayersPanel({
     setEditingId(null)
   }
 
+  // The locked background layer can't be deleted or duplicated.
+  const activeIsBackground = layers.find((l) => l.id === activeLayerId)?.background === true
+
   const onDragEnd = (e: DragEndEvent) => {
     const { active, over } = e
     if (over && active.id !== over.id) {
@@ -204,6 +219,7 @@ export function LayersPanel({
                 layer={layer}
                 active={layer.id === activeLayerId}
                 editing={editingId === layer.id}
+                pinned={layer.background === true}
                 onSelect={onSelect}
                 onToggle={onToggle}
                 onStartEdit={setEditingId}
@@ -227,16 +243,22 @@ export function LayersPanel({
         <button
           type="button"
           onClick={() => onDuplicate(activeLayerId)}
+          disabled={activeIsBackground}
           aria-label="Duplicate layer"
-          className={cn(footerBtn, "px-3")}
+          className={cn(footerBtn, "px-3", activeIsBackground && "cursor-not-allowed opacity-40")}
         >
           <Copy size={16} />
         </button>
         <button
           type="button"
           onClick={onDelete}
+          disabled={activeIsBackground}
           aria-label="Delete layer"
-          className={cn(footerBtn, "px-3 text-fg-faint")}
+          className={cn(
+            footerBtn,
+            "px-3 text-fg-faint",
+            activeIsBackground && "cursor-not-allowed opacity-40",
+          )}
         >
           <Trash2 size={17} />
         </button>

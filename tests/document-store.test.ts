@@ -75,3 +75,43 @@ describe("documentStore layer ops", () => {
     expect(store.getState().layers.find((l) => l.id === "l3")?.visible).toBe(true)
   })
 })
+
+describe("documentStore — the background layer is locked", () => {
+  const ids = () => useDocumentStore.getState().layers.map((l) => l.id)
+  const withBackground = (activeLayerId = "bg") =>
+    useDocumentStore.setState({
+      layers: [
+        { id: "a", name: "Layer 1", type: "raster", visible: true, opacity: 100 },
+        {
+          id: "bg",
+          name: "Background",
+          type: "raster",
+          visible: true,
+          opacity: 100,
+          background: true,
+        },
+      ],
+      activeLayerId,
+      nextLayerNum: 2,
+    })
+
+  it("refuses to delete the background", () => {
+    withBackground("bg")
+    useDocumentStore.getState().deleteActiveLayer()
+    expect(ids()).toEqual(["a", "bg"])
+  })
+
+  it("won't move the background and keeps it pinned at the bottom", () => {
+    withBackground()
+    useDocumentStore.getState().moveLayer("bg", 0) // the background itself can't move
+    expect(ids()).toEqual(["a", "bg"])
+    useDocumentStore.getState().moveLayer("a", 1) // nothing can land at/below the background
+    expect(ids()).toEqual(["a", "bg"])
+  })
+
+  it("refuses to duplicate the background", () => {
+    withBackground()
+    useDocumentStore.getState().duplicateLayer("bg", "dup")
+    expect(ids()).toEqual(["a", "bg"])
+  })
+})

@@ -1,5 +1,5 @@
 import { create } from "zustand"
-import { INITIAL_ACTIVE_LAYER_ID, INITIAL_LAYERS } from "@/editor/mock-data"
+import { INITIAL_ACTIVE_LAYER_ID, INITIAL_LAYERS, INITIAL_NEXT_LAYER_NUM } from "@/editor/mock-data"
 import { newLayerId } from "@/editor/state/ids"
 import type { Layer, LayerType } from "@/editor/types"
 
@@ -37,8 +37,13 @@ export function initialDocumentState(): DocumentSnapshot {
   return {
     layers: INITIAL_LAYERS.map((l) => ({ ...l })),
     activeLayerId: INITIAL_ACTIVE_LAYER_ID,
-    nextLayerNum: INITIAL_LAYERS.length + 1,
+    nextLayerNum: INITIAL_NEXT_LAYER_NUM,
   }
+}
+
+/** The pinned background layer's index, or -1 if the document has none (legacy docs). */
+function backgroundIndex(layers: Layer[]): number {
+  return layers.findIndex((l) => l.background)
 }
 
 function arrayMove<T>(arr: T[], from: number, to: number): T[] {
@@ -78,6 +83,8 @@ export const useDocumentStore = create<DocumentState>()((set) => ({
   deleteActiveLayer: () =>
     set((s) => {
       if (s.layers.length <= 1) return s
+      // The background layer is locked — it can't be deleted.
+      if (s.layers.find((l) => l.id === s.activeLayerId)?.background) return s
       const remaining = s.layers.filter((l) => l.id !== s.activeLayerId)
       return { layers: remaining, activeLayerId: remaining[0]?.id ?? "" }
     }),
@@ -86,7 +93,11 @@ export const useDocumentStore = create<DocumentState>()((set) => ({
     set((s) => {
       const from = s.layers.findIndex((l) => l.id === id)
       if (from === -1) return s
-      const to = Math.min(s.layers.length - 1, Math.max(0, toIndex))
+      // The background stays pinned at the bottom: it can't move, and nothing lands at/below it.
+      if (s.layers[from]?.background) return s
+      const bg = backgroundIndex(s.layers)
+      const maxIndex = bg === -1 ? s.layers.length - 1 : bg - 1
+      const to = Math.min(maxIndex, Math.max(0, toIndex))
       if (from === to) return s
       return { layers: arrayMove(s.layers, from, to) }
     }),
@@ -102,7 +113,8 @@ export const useDocumentStore = create<DocumentState>()((set) => ({
     set((s) => {
       const i = s.layers.findIndex((l) => l.id === id)
       const src = s.layers[i]
-      if (!src) return s
+      // The background can't be duplicated (converting it to a normal layer is deferred).
+      if (!src || src.background) return s
       // Insert the copy at the source's index → directly above it (index 0 = top).
       const copy: Layer = { ...src, id: newId, name: `${src.name} copy` }
       const layers = [...s.layers.slice(0, i), copy, ...s.layers.slice(i)]

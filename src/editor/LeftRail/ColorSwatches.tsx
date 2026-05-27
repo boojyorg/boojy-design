@@ -2,22 +2,23 @@ import { ArrowDownUp } from "lucide-react"
 import { ColorPopover } from "@/components/ColorPopover"
 
 /**
- * Stacked FG/BG colour swatches at the rail's base, plus a swap control. Shape
- * grammar: squares = action tools (above), circles = colour properties (here).
- * Painting always uses the foreground; the swap button (and X) flips the two,
- * D resets to black/white.
+ * Stacked foreground / secondary colour swatches at the rail's base, plus a swap control.
+ * Shape grammar: squares = action tools (above), circles = colour properties (here).
+ * Painting always uses the foreground; the swap button (and X) flips the two, D resets to
+ * black/white. The "secondary" colour is a painting colour-memory — distinct from the
+ * document's Background layer.
  */
 export function ColorSwatches({
   foreground,
-  background,
+  secondaryColor,
   onForeground,
-  onBackground,
+  onSecondaryColor,
   onSwap,
 }: {
   foreground: string
-  background: string
+  secondaryColor: string
   onForeground: (color: string) => void
-  onBackground: (color: string) => void
+  onSecondaryColor: (color: string) => void
   onSwap: () => void
 }) {
   return (
@@ -30,17 +31,17 @@ export function ColorSwatches({
           style={{ backgroundColor: foreground }}
         />
       </ColorPopover>
-      <ColorPopover value={background} onChange={onBackground}>
+      <ColorPopover value={secondaryColor} onChange={onSecondaryColor}>
         <button
           type="button"
-          aria-label="Background color"
+          aria-label="Secondary color"
           className="size-[30px] rounded-full border-2 border-chrome shadow-[0_0_0_1px_var(--color-divider)]"
-          style={{ backgroundColor: background }}
+          style={{ backgroundColor: secondaryColor }}
         />
       </ColorPopover>
       <button
         type="button"
-        aria-label="Swap foreground and background colors"
+        aria-label="Swap foreground and secondary colors"
         onClick={onSwap}
         className="mt-0.5 flex size-5 items-center justify-center rounded text-fg-dim hover:bg-elevated hover:text-fg"
       >

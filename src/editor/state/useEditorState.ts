@@ -15,9 +15,9 @@ export interface EditorState {
   hardness: number
   opacity: number
   foreground: string
-  /** Secondary colour slot. Painting always uses `foreground`; X swaps the two,
-   *  D resets to black/white. No tool consumes `background` directly yet. */
-  background: string
+  /** Secondary colour slot (a painting colour memory — NOT the document background).
+   *  Painting always uses `foreground`; X swaps the two, D resets to black/white. */
+  secondaryColor: string
   /** Which primitive the Shape tool draws. */
   shapeKind: VectorKind
   /** Fill tool match looseness, 0–100. */
@@ -32,7 +32,7 @@ export type EditorAction =
   | { type: "setHardness"; value: number }
   | { type: "setOpacity"; value: number }
   | { type: "setForeground"; color: string }
-  | { type: "setBackground"; color: string }
+  | { type: "setSecondaryColor"; color: string }
   | { type: "swapColors" }
   | { type: "resetColors" }
   | { type: "applySampledColor"; color: string }
@@ -47,7 +47,7 @@ const initialState: EditorState = {
   hardness: 80,
   opacity: 100,
   foreground: "#E89940",
-  background: "#FFFFFF",
+  secondaryColor: "#FFFFFF",
   shapeKind: "rect",
   fillTolerance: 20,
   rightCollapsed: false,
@@ -77,13 +77,13 @@ function reducer(state: EditorState, action: EditorAction): EditorState {
       return { ...state, opacity: action.value }
     case "setForeground":
       return { ...state, foreground: action.color }
-    case "setBackground":
-      return { ...state, background: action.color }
+    case "setSecondaryColor":
+      return { ...state, secondaryColor: action.color }
     case "swapColors":
-      return { ...state, foreground: state.background, background: state.foreground }
+      return { ...state, foreground: state.secondaryColor, secondaryColor: state.foreground }
     case "resetColors":
-      // D resets to the classic black-foreground / white-background defaults.
-      return { ...state, foreground: "#000000", background: "#FFFFFF" }
+      // D resets to the classic black-foreground / white-secondary defaults.
+      return { ...state, foreground: "#000000", secondaryColor: "#FFFFFF" }
     case "applySampledColor":
       // Eyedropper picked a colour: set it and return to the pre-eyedropper tool.
       return { ...state, foreground: action.color, activeTool: state.previousTool }
