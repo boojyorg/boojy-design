@@ -1,8 +1,9 @@
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef } from "react"
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react"
 import { CanvasEngine } from "@/editor/Canvas/engine/CanvasEngine"
 import { IDENTITY, type Transform } from "@/editor/Canvas/engine/transform"
 import { useThumbnailStore } from "@/editor/state/thumbnailStore"
 import { useUndoStore } from "@/editor/state/undoStore"
+import { useViewportStore } from "@/editor/state/viewportStore"
 import type { Layer, ToolId, VectorKind } from "@/editor/types"
 import { toLayerName } from "@/lib/filename"
 import { decodeImageFile } from "@/lib/loadImage"
@@ -29,7 +30,6 @@ interface CanvasStageProps {
   foreground: string
   shapeKind: VectorKind
   fillTolerance: number
-  zoom: number
   layers: Layer[]
   activeLayerId: string
   /** Ask the chrome to add an image-typed layer (the document store owns layer metadata). */
@@ -61,6 +61,20 @@ export const CanvasStage = forwardRef<CanvasStageHandle, CanvasStageProps>(
     const record = useUndoStore((s) => s.record)
     const setThumbnail = useThumbnailStore((s) => s.setThumbnail)
     const removeThumbnail = useThumbnailStore((s) => s.removeThumbnail)
+    // Viewport (zoom + pan) — the engine seam owns navigation gestures, so subscribe directly.
+    const zoom = useViewportStore((s) => s.zoom)
+    const panX = useViewportStore((s) => s.panX)
+    const panY = useViewportStore((s) => s.panY)
+    const setContainerSize = useViewportStore((s) => s.setContainerSize)
+    const zoomAtCursor = useViewportStore((s) => s.zoomAtCursor)
+    const panBy = useViewportStore((s) => s.panBy)
+    // Pan gesture (Space-drag or Hand tool): held button + last pointer position.
+    const panningRef = useRef(false)
+    const lastPanRef = useRef<{ x: number; y: number } | null>(null)
+    // Space held? Drives a temporary pan mode + grab cursor from any tool. `grabbing` is the
+    // active-drag state (so the cursor is declarative — no imperative style fight).
+    const [spaceDown, setSpaceDown] = useState(false)
+    const [grabbing, setGrabbing] = useState(false)
     // A decoded image waiting for its layer's node to exist (drawn in the layers effect).
     const pendingImageRef = useRef<{ source: CanvasImageSource; w: number; h: number } | null>(null)
     // Pixel snapshots waiting for their layer's node to exist, drained after the next sync.
@@ -190,8 +204,68 @@ export const CanvasStage = forwardRef<CanvasStageHandle, CanvasStageProps>(
     }, [props.layers, props.activeLayerId])
 
     useEffect(() => {
-      engineRef.current?.setZoom(props.zoom)
-    }, [props.zoom])
+      engineRef.current?.setView(zoom, panX, panY)
+    }, [zoom, panX, panY])
+
+    // Report the stage's measured size to the viewport store so zoom can anchor to the
+    // viewport centre (and fit can size the page). Re-measure on resize.
+    useEffect(() => {
+      const host = hostRef.current
+      if (!host) return
+      const measure = () => {
+        const r = host.getBoundingClientRect()
+        setContainerSize(r.width || 1, r.height || 1)
+      }
+      measure()
+      const ro = new ResizeObserver(measure)
+      ro.observe(host)
+      return () => ro.disconnect()
+    }, [setContainerSize])
+
+    // Wheel: plain scroll pans; pinch / ⌘-scroll (both arrive as ctrlKey) zooms toward the
+    // cursor. A native non-passive listener — React's onWheel is passive and can't preventDefault.
+    useEffect(() => {
+      const host = hostRef.current
+      if (!host) return
+      const onWheel = (e: WheelEvent) => {
+        e.preventDefault()
+        if (e.ctrlKey) {
+          const r = host.getBoundingClientRect()
+          zoomAtCursor(Math.exp(-e.deltaY * 0.0015), e.clientX - r.left, e.clientY - r.top)
+        } else {
+          panBy(-e.deltaX, -e.deltaY)
+        }
+      }
+      host.addEventListener("wheel", onWheel, { passive: false })
+      return () => host.removeEventListener("wheel", onWheel)
+    }, [zoomAtCursor, panBy])
+
+    // Space held → temporary pan mode (grab cursor) from any tool, like every editor. Ignored
+    // while typing or when a button is focused (so Space still activates the focused control).
+    useEffect(() => {
+      const onKey = (e: KeyboardEvent) => {
+        if (e.key !== " ") return
+        const t = e.target as HTMLElement | null
+        if (
+          t &&
+          (t.tagName === "INPUT" ||
+            t.tagName === "TEXTAREA" ||
+            t.tagName === "SELECT" ||
+            t.tagName === "BUTTON" ||
+            t.isContentEditable)
+        ) {
+          return
+        }
+        e.preventDefault() // stop the page from scrolling on Space
+        setSpaceDown(e.type === "keydown")
+      }
+      window.addEventListener("keydown", onKey)
+      window.addEventListener("keyup", onKey)
+      return () => {
+        window.removeEventListener("keydown", onKey)
+        window.removeEventListener("keyup", onKey)
+      }
+    }, [])
 
     // Move tool: arrow keys nudge the active layer (1px; 10px with Shift), each press a
     // single undoable step. Only attached while Move is active, so other tools' arrow
@@ -229,9 +303,19 @@ export const CanvasStage = forwardRef<CanvasStageHandle, CanvasStageProps>(
 
     const isPaintTool = props.tool === "brush" || props.tool === "eraser" || props.tool === "shape"
     const showCrosshair = isPaintTool || props.tool === "eyedropper" || props.tool === "fill"
-    // For Move, the engine drives the container cursor on hover (handle-aware); for the rest,
-    // a static cursor here. Leaving it undefined for Move lets the engine's imperative set stick.
-    const cursor = props.tool === "select" ? undefined : showCrosshair ? "crosshair" : "default"
+    // Pan mode (Space held or Hand tool) wins over every tool cursor. Otherwise: for Move the
+    // engine drives the container cursor on hover (handle-aware), so leave it undefined; the rest
+    // are static here.
+    const panMode = spaceDown || props.tool === "hand"
+    const cursor = grabbing
+      ? "grabbing"
+      : panMode
+        ? "grab"
+        : props.tool === "select"
+          ? undefined
+          : showCrosshair
+            ? "crosshair"
+            : "default"
 
     return (
       <div
@@ -246,6 +330,14 @@ export const CanvasStage = forwardRef<CanvasStageHandle, CanvasStageProps>(
           className="absolute inset-0"
           style={{ cursor, touchAction: "none" }}
           onPointerDown={(e) => {
+            // Pan (Space-drag or Hand tool) pre-empts every tool.
+            if (panMode) {
+              e.currentTarget.setPointerCapture(e.pointerId)
+              panningRef.current = true
+              lastPanRef.current = { x: e.clientX, y: e.clientY }
+              setGrabbing(true)
+              return
+            }
             if (props.tool === "eyedropper") {
               const hex = engineRef.current?.sampleColorAt(e.clientX, e.clientY)
               if (hex) props.onSampleColor(hex)
@@ -259,17 +351,42 @@ export const CanvasStage = forwardRef<CanvasStageHandle, CanvasStageProps>(
             engineRef.current?.beginStroke(e.clientX, e.clientY)
           }}
           onPointerMove={(e) => {
+            if (panningRef.current) {
+              const last = lastPanRef.current
+              if (last) {
+                panBy(e.clientX - last.x, e.clientY - last.y)
+                lastPanRef.current = { x: e.clientX, y: e.clientY }
+              }
+              return
+            }
             engineRef.current?.continueStroke(e.clientX, e.clientY, e.shiftKey)
             // Move tool: update the handle-aware cursor on hover (no-ops mid-drag).
             if (props.tool === "select") engineRef.current?.pointerHover(e.clientX, e.clientY)
           }}
           onPointerUp={(e) => {
+            if (panningRef.current) {
+              panningRef.current = false
+              lastPanRef.current = null
+              setGrabbing(false)
+              if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+                e.currentTarget.releasePointerCapture(e.pointerId)
+              }
+              return
+            }
             engineRef.current?.endStroke()
             if (e.currentTarget.hasPointerCapture(e.pointerId)) {
               e.currentTarget.releasePointerCapture(e.pointerId)
             }
           }}
-          onPointerCancel={() => engineRef.current?.endStroke()}
+          onPointerCancel={() => {
+            if (panningRef.current) {
+              panningRef.current = false
+              lastPanRef.current = null
+              setGrabbing(false)
+              return
+            }
+            engineRef.current?.endStroke()
+          }}
           onDragOver={(e) => e.preventDefault()}
           onDrop={(e) => {
             e.preventDefault()

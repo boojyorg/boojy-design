@@ -26,13 +26,17 @@ Two things that still shape any change:
   that seam — don't scatter it through the chrome.
 - **State is graduating from one reducer to Zustand stores.** The document model (layer
   stack + active layer) lives in `src/editor/state/documentStore.ts`, the undo timeline
-  in `src/editor/state/undoStore.ts` (a stack of `Command`s — see `commands.ts`), and the
+  in `src/editor/state/undoStore.ts` (a stack of `Command`s — see `commands.ts`), the
   layer-preview cache in `src/editor/state/thumbnailStore.ts` (layerId → dataURL, fed by the
-  engine — see Layers panel below). The rest — tool, brush params, zoom, panel chrome — is
-  still the local `useReducer` (`src/editor/state/useEditorState.ts`). The one planned store
-  left, `viewportStore` (zoom), lands *as* that work does — introduce it then, not as a
-  speculative refactor. **These stores are module singletons**, so tests reset them in
-  `vitest.setup.ts` — any new store needs the same.
+  engine — see Layers panel below), and the **canvas viewport** (zoom **+ pan**) in
+  `src/editor/state/viewportStore.ts`. That was the last planned store — only **tool, brush
+  params, and panel chrome** remain in the local `useReducer`
+  (`src/editor/state/useEditorState.ts`). The viewport store is the single source of truth for
+  the view (`{zoom, panX, panY}` + the reported container size); `CanvasStage` applies it to the
+  engine (`setView`) and routes navigation gestures back to it, with the *pure* view math in
+  `engine/viewport.ts`. **View state is deliberately NOT persisted** in `.design` — it's
+  per-session. **These stores are module singletons**, so tests reset them in `vitest.setup.ts`
+  — any new store needs the same.
 
 ## Commands
 
@@ -144,8 +148,9 @@ hot path clears 60fps at 2K/50 layers even with a naive single-composite redraw 
   stores, ~800MB for 50×2K). Keep the 50-layer cap; tiling/dirty-tracking is later.
 
 **The engine is in active development.** The brush hot path has shipped — a raster brush +
-eraser paint to per-layer buffers on the naive single-composite path (1280×800 page, zoom
-drives the Konva stage scale). Pure stamp/viewport math is unit-tested; the engine
+eraser paint to per-layer buffers on the naive single-composite path (1280×800 page; zoom
+**and pan** drive the content layer's scale + position via `setView`). Pure stamp/viewport
+math is unit-tested; the engine
 capability-guards on `getContext` and no-ops under jsdom, so the shell tests stay green
 without a canvas mock. Keep scope MVP-disciplined (see Roadmap).
 
@@ -199,7 +204,13 @@ export). The transform is saved in `.design` (additive `transform` field — leg
 `/offsetY` still read), copied on duplicate, and restored on undo-delete (the `Map` entry outlives
 the destroyed node; `syncLayers`
 re-applies it). The selection box + 8 handles draw on a **screen-space overlay** layer so they stay
-a constant size under zoom. **Next:** the remaining v0.5 tools below. Then v0.5+: Move *skew / flip*
+a constant size under zoom. Plus **viewport navigation** (`viewportStore` + `engine/viewport.ts`):
+**scroll-to-pan**, **pinch / ⌘-scroll zoom-toward-cursor** (both arrive as `ctrlKey` wheel events),
+**Space-drag** pan from any tool, the **Hand tool** (`H`) panning, and **⌘0 fit** / **⌘1 100%** (the
+zoom % readout is a fit button); buttons + `+`/`-` step a **preset zoom ladder** (`ZOOM_STOPS`,
+Chrome-like — finer near 100%) around the viewport centre, while pinch/scroll stays continuous. Zoom **+ pan**
+live in `viewportStore` (the last reducer field to graduate); the math is pure + node-tested; view
+state is **not** persisted. **Next:** the remaining v0.5 tools below. Then v0.5+: Move *skew / flip*
 (negative scale), Text tool, blend modes. These aren't forbidden —
 they're sequenced. Don't pile features onto the shell
 all at once; the **8-feature MVP cap** is the discipline lever. As a side-project this sits

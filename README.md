@@ -9,8 +9,8 @@ rail, canvas, and collapsible right sidebar.
 > **image import** (open or drag-drop), **PNG export**, and **save/open** of `.design`
 > documents — all behind a clean seam
 > (`src/editor/Canvas/CanvasStage.tsx` → `src/editor/Canvas/engine/`). The document model
-> (layers) now lives in a Zustand `documentStore`; the rest of the shell state is still a
-> local reducer, graduating store by store as each piece of work lands.
+> (layers) lives in a Zustand `documentStore` and the canvas viewport (zoom + pan) in a
+> `viewportStore`; only tool/brush/panel-chrome state is still a local reducer.
 
 ## Stack
 
@@ -38,7 +38,8 @@ shadcn-style Radix primitives · react-colorful · dnd-kit · Lucide · Vitest +
 - `src/editor/Canvas/engine/` — the imperative Konva engine behind the canvas seam (brush/eraser, per-layer pixel buffers, viewport math).
 - `src/editor/state/documentStore.ts` — Zustand store for the document model (layer stack + active layer).
 - `src/editor/state/undoStore.ts` — Zustand undo/redo timeline (a stack of commands; see `commands.ts`).
-- `src/editor/state/useEditorState.ts` — local reducer for the rest of the shell (tool, brush, zoom, panel chrome).
+- `src/editor/state/viewportStore.ts` — Zustand store for the canvas viewport (zoom + pan; pure math in `engine/viewport.ts`).
+- `src/editor/state/useEditorState.ts` — local reducer for the rest of the shell (tool, brush, panel chrome).
 - `src/lib/designFile.ts` — `.design` save/open format (layer metadata + embedded base64 PNGs).
 - `src/components/` — reusable primitives (+ `ui/` shadcn-style Radix wrappers).
 - `src/theme/base.tokens.css` — shared Boojy tokens; `accent.design.css` — the per-product amber (the single swap point for other Boojy products).
@@ -46,7 +47,7 @@ shadcn-style Radix primitives · react-colorful · dnd-kit · Lucide · Vitest +
 ## Roadmap
 
 Shipped: the Konva canvas engine — a raster **brush + eraser** (1280×800 page, per-layer
-buffers, zoom-as-stage-scale), an editable **foreground colour** picker, **image import**
+buffers), an editable **foreground colour** picker, **image import**
 (Import image… / drag-drop), **PNG export** (Design menu or ⌘E), **layer ops** — drag-to-reorder,
 inline rename, duplicate, delete — a **unified undo/redo** timeline (Cmd+Z / Cmd+Shift+Z)
 where strokes and every layer op share one history (including undo-delete with pixels intact),
@@ -64,7 +65,11 @@ where the layer is *drawn* without touching its pixels, so dragging off the page
 but keeps it, and undo/redo step through each transform. Context-aware cursors (rotation-aware);
 arrow keys nudge (10px holding Shift); export and `.design` files honour the transform.
 The **Layers panel shows live thumbnails** — each layer's content, trimmed to fill the box,
-refreshing as you edit (blank layers read empty). After MVP (v0.5+): skew/flip,
+refreshing as you edit (blank layers read empty). And **canvas navigation** that feels like a
+real editor: **scroll to pan**, **pinch / ⌘-scroll to zoom toward the cursor**, hold **Space**
+(or the **Hand** tool, `H`) to drag-pan, and **⌘0** to fit / **⌘1** for 100% (click the zoom %
+to fit). Zoom + pan live in `viewportStore`; the view is per-session and isn't saved in
+`.design`. After MVP (v0.5+): skew/flip,
 Text, blend modes. The lone
 non-MVP tool (Text) appears in the rail, dimmed with a "coming in v0.5" tooltip. Sequenced,
 not piled on at once — the 8-feature MVP cap is the discipline lever.

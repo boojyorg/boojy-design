@@ -2,10 +2,10 @@ import { useReducer } from "react"
 import type { ToolId, VectorKind } from "@/editor/types"
 
 /**
- * Shell UI state — tool selection, brush params, zoom, and panel chrome. One
- * reducer, local-only. The document model (layers/active layer) has graduated to
- * `documentStore`; viewport (zoom) and pure-UI bits still live here until they
- * earn their own stores. Nothing here is persisted.
+ * Shell UI state — tool selection, brush params, and panel chrome. One reducer,
+ * local-only. The document model (layers/active layer) lives in `documentStore` and
+ * the canvas viewport (zoom + pan) in `viewportStore`; only pure-UI bits remain here.
+ * Nothing here is persisted.
  */
 export interface EditorState {
   activeTool: ToolId
@@ -19,7 +19,6 @@ export interface EditorState {
   shapeKind: VectorKind
   /** Fill tool match looseness, 0–100. */
   fillTolerance: number
-  zoom: number
   rightCollapsed: boolean
 }
 
@@ -33,7 +32,6 @@ export type EditorAction =
   | { type: "applySampledColor"; color: string }
   | { type: "setShapeKind"; kind: VectorKind }
   | { type: "setFillTolerance"; value: number }
-  | { type: "nudgeZoom"; delta: number }
   | { type: "toggleRight" }
 
 const initialState: EditorState = {
@@ -45,11 +43,9 @@ const initialState: EditorState = {
   foreground: "#E89940",
   shapeKind: "rect",
   fillTolerance: 20,
-  zoom: 75,
   rightCollapsed: false,
 }
 
-const clampZoom = (z: number) => Math.min(400, Math.max(10, z))
 const clampSize = (s: number) => Math.min(500, Math.max(1, s))
 
 function reducer(state: EditorState, action: EditorAction): EditorState {
@@ -81,8 +77,6 @@ function reducer(state: EditorState, action: EditorAction): EditorState {
       return { ...state, shapeKind: action.kind }
     case "setFillTolerance":
       return { ...state, fillTolerance: action.value }
-    case "nudgeZoom":
-      return { ...state, zoom: clampZoom(state.zoom + action.delta) }
     case "toggleRight":
       return { ...state, rightCollapsed: !state.rightCollapsed }
   }
