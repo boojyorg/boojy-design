@@ -8,9 +8,12 @@ const meta = {
   args: {
     activeTool: "brush",
     foreground: "#E89940",
+    background: "#FFFFFF",
     shapeKind: "rect",
     onSelectTool: () => {},
     onForeground: () => {},
+    onBackground: () => {},
+    onSwapColors: () => {},
   },
   decorators: [
     (Story) => (

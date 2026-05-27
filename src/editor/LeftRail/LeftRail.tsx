@@ -8,18 +8,24 @@ import { ColorSwatches } from "./ColorSwatches"
 interface LeftRailProps {
   activeTool: ToolId
   foreground: string
+  background: string
   /** The Shape tool's rail icon morphs to show this (square / circle). */
   shapeKind: VectorKind
   onSelectTool: (tool: ToolId) => void
   onForeground: (color: string) => void
+  onBackground: (color: string) => void
+  onSwapColors: () => void
 }
 
 export function LeftRail({
   activeTool,
   foreground,
+  background,
   shapeKind,
   onSelectTool,
   onForeground,
+  onBackground,
+  onSwapColors,
 }: LeftRailProps) {
   return (
     <nav
@@ -63,7 +69,13 @@ export function LeftRail({
 
       <div className="flex-1" />
       <div className="my-1.5 h-px w-7 bg-divider" />
-      <ColorSwatches foreground={foreground} onForeground={onForeground} />
+      <ColorSwatches
+        foreground={foreground}
+        background={background}
+        onForeground={onForeground}
+        onBackground={onBackground}
+        onSwap={onSwapColors}
+      />
     </nav>
   )
 }

@@ -12,7 +12,8 @@ const TOOL_KEYS: Record<string, ToolId> = Object.fromEntries(
 /**
  * Global editor shortcuts (disposable, like the rest of the shell state):
  * ⌘O opens a document, ⌘S saves, ⌘E exports, ⌘Z/⌘⇧Z undo/redo, ⌘0 fits the page,
- * ⌘1 = 100%, B/E/R/H select tools, [ ] nudge brush size, +/- zoom. Other modifier
+ * ⌘1 = 100%, B/E/R/H select tools, [ ] nudge brush size, +/- zoom, X swaps the
+ * foreground/background colours, D resets them to black/white. Other modifier
  * combos and typing are ignored (so OS/browser shortcuts pass through).
  */
 export function useKeyboardShortcuts(
@@ -92,9 +93,18 @@ export function useKeyboardShortcuts(
 
       if (e.metaKey || e.ctrlKey || e.altKey) return
 
-      const toolId = TOOL_KEYS[e.key.toLowerCase()]
+      const key = e.key.toLowerCase()
+      const toolId = TOOL_KEYS[key]
       if (toolId) {
         dispatch({ type: "setTool", tool: toolId })
+        return
+      }
+      if (key === "x") {
+        dispatch({ type: "swapColors" })
+        return
+      }
+      if (key === "d") {
+        dispatch({ type: "resetColors" })
         return
       }
 
