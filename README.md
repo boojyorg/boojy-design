@@ -15,6 +15,8 @@ collapsible right sidebar.
 
 - **Paint** — raster brush & eraser in any colour (size · hardness · opacity); a flood-**fill**
   bucket with a tolerance slider; an **eyedropper** that samples the colour under the cursor.
+- **Colours** — foreground + background swatches in the rail; **X** swaps them, **D** resets to
+  black/white. (Painting always uses the foreground; background is a convenience slot.)
 - **Shapes** — drag a filled rectangle or ellipse onto the active layer (Shift → square/circle).
 - **Move / transform** — a non-destructive 8-handle free transform: proportional corners (Shift =
   free), single-axis edges, a rotate grip (15° snap), drag-inside to move; rotation-aware cursors and

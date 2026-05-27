@@ -32,7 +32,7 @@ Two things that still shape any change:
   layer-preview cache in `src/editor/state/thumbnailStore.ts` (layerId → dataURL, fed by the
   engine — see Layers panel below), and the **canvas viewport** (zoom **+ pan**) in
   `src/editor/state/viewportStore.ts`. That was the last planned store — only **tool, brush
-  params, and panel chrome** remain in the local `useReducer`
+  params, colours (foreground + background; X swaps, D resets), and panel chrome** remain in the local `useReducer`
   (`src/editor/state/useEditorState.ts`). The viewport store is the single source of truth for
   the view (`{zoom, panX, panY}` + the reported container size); `CanvasStage` applies it to the
   engine (`setView`) and routes navigation gestures back to it, with the *pure* view math in

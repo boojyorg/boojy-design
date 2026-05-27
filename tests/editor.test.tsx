@@ -221,6 +221,31 @@ describe("EditorV1 shell", () => {
     )
   })
 
+  it("swaps (X) and resets (D) the foreground/background colours", () => {
+    renderEditor()
+    // Scope FG to the rail — the top bar's colour chip shares the "Foreground color" label.
+    const rail = screen.getByRole("navigation", { name: "Tools" })
+    const fg = () => within(rail).getByRole("button", { name: "Foreground color" })
+    const bg = () => screen.getByRole("button", { name: "Background color" })
+
+    // D resets to black FG / white BG.
+    fireEvent.keyDown(document.body, { key: "d" })
+    expect(fg().style.backgroundColor).toBe("rgb(0, 0, 0)")
+    expect(bg().style.backgroundColor).toBe("rgb(255, 255, 255)")
+
+    // X swaps the two.
+    fireEvent.keyDown(document.body, { key: "x" })
+    expect(fg().style.backgroundColor).toBe("rgb(255, 255, 255)")
+    expect(bg().style.backgroundColor).toBe("rgb(0, 0, 0)")
+
+    // The rail's swap button does the same.
+    fireEvent.click(
+      within(rail).getByRole("button", { name: "Swap foreground and background colors" }),
+    )
+    expect(fg().style.backgroundColor).toBe("rgb(0, 0, 0)")
+    expect(bg().style.backgroundColor).toBe("rgb(255, 255, 255)")
+  })
+
   it("ignores shortcuts for the non-MVP Text tool (T does nothing)", () => {
     renderEditor()
     fireEvent.keyDown(document.body, { key: "t" })
