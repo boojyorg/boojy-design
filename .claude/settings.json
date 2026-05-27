@@ -1,4 +1,5 @@
 {
+  "model": "opusplan",
   "hooks": {
     "PostToolUse": [
       {
@@ -6,7 +7,16 @@
         "hooks": [
           {
             "type": "command",
-            "command": "jq -r '.tool_input.command // \"\"' | grep -qE 'pnpm( +run)? +(test|build)' && printf '%s' '{\"hookSpecificOutput\":{\"hookEventName\":\"PostToolUse\",\"additionalContext\":\"Docs check — pnpm test/build just ran. Confirm README.md and CLAUDE.md still match the code; if this change shifted a feature, architecture, or roadmap item, update both in the same change.\"}}' || true"
+            "command": "jq -r '.tool_input.command // \"\"' | grep -qE 'pnpm( +run)? +(test|build)' && printf '%s' '{\"hookSpecificOutput\":{\"hookEventName\":\"PostToolUse\",\"additionalContext\":\"CRITICAL: Update README.md/CLAUDE.md if features or architecture shifted.\"}}' || true"
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "./.claude/hooks/post-edit-validation.sh"
           }
         ]
       }
