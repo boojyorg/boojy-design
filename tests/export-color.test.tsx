@@ -10,7 +10,9 @@ describe("PNG export wiring", () => {
   it("fires onExport when the Export… menu item is selected", async () => {
     const user = userEvent.setup()
     const onExport = vi.fn()
-    render(<AppMenu onExport={onExport} onOpen={() => {}} />)
+    render(
+      <AppMenu onExport={onExport} onOpen={() => {}} onSave={() => {}} onImportImage={() => {}} />,
+    )
 
     await user.click(screen.getByRole("button")) // open the Design menu
     await user.click(await screen.findByText("Export…"))

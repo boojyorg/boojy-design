@@ -24,6 +24,8 @@ function renderTopBar(overrides: Partial<ComponentProps<typeof TopBar>> = {}) {
     onToggleRight: noop,
     onExport: noop,
     onOpen: noop,
+    onSave: noop,
+    onImportImage: noop,
     onUndo: noop,
     onRedo: noop,
     canUndo: false,

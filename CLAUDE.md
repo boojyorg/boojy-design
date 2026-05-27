@@ -12,8 +12,9 @@ shell shipped and is live, and the design direction is **confirmed**, so this is
 landed and the **MVP paint loop is in place** — paint/erase in any colour across layers
 (reorder/rename/duplicate), undo/redo, image import, PNG export — all behind the canvas seam
 (see "Engine decision" and "Roadmap" below). The document model has graduated to a Zustand
-`documentStore`, and undo/redo is now a **unified timeline** (`undoStore`) — strokes *and*
-every layer op (incl. undo-delete with pixels) sit on one stack. Next is persistence.
+`documentStore`, undo/redo is a **unified timeline** (`undoStore`) — strokes *and* every layer
+op (incl. undo-delete with pixels) on one stack — and documents **save/open** as `.design`
+files (`src/lib/designFile.ts`). Next are the v0.5 tools.
 
 Two things that still shape any change:
 - **The canvas is a seam.** `src/editor/Canvas/CanvasStage.tsx` mounts the imperative Konva
@@ -115,14 +116,18 @@ without a canvas mock. Keep scope MVP-disciplined (see Roadmap).
 ## Roadmap (sequence intentionally — confirm scope before starting a new item)
 
 Rough order, MVP first — **shipped:** canvas engine (Konva, brush hot path) + raster
-brush/eraser + editable foreground colour + PNG export (menu / ⌘E) + image import (Open… /
-drag-drop / ⌘O, fit-centered new layer; **not undoable** — adds a layer outside the timeline)
-+ layer ops (drag-reorder via dnd-kit, inline rename, duplicate-with-pixels, delete) +
-document model in Zustand (`documentStore`) + **unified undo/redo** (`undoStore`, a `Command`
+brush/eraser + editable foreground colour + PNG export (menu / ⌘E) + image import (Import
+image… / drag-drop, fit-centered new layer; **not undoable** — adds a layer outside the
+timeline) + layer ops (drag-reorder via dnd-kit, inline rename, duplicate-with-pixels, delete)
++ document model in Zustand (`documentStore`) + **unified undo/redo** (`undoStore`, a `Command`
 stack — see `commands.ts`): strokes and every layer op share one linear timeline, including
-**undo-delete** (the deleted layer's pixels are captured and replayed). Plain layer selection
-is deliberately *not* on the timeline. **Next:** persistence. v0.5+ tools below.
-Then v0.5+: Move/transform tool, Text tool, eyedropper, blend modes, persistence/`.design`
-file format. These aren't forbidden — they're sequenced. Don't pile features onto the shell
+**undo-delete** (the deleted layer's pixels are captured and replayed); plain layer selection
+is deliberately *not* on the timeline + **persistence** — save/open `.design` files (⌘S / ⌘O,
+`src/lib/designFile.ts`): JSON holding layer metadata + each layer's pixels as an embedded
+base64 PNG; opening resets the undo timeline. **The menu's verbs:** Open… (⌘O) = a `.design`
+document; Import image… = a bitmap layer; Save (⌘S) = `.design`; Export… (⌘E) = flattened PNG.
+**Next:** the v0.5 tools below.
+Then v0.5+: Move/transform tool, Text tool, eyedropper, blend modes. These aren't forbidden —
+they're sequenced. Don't pile features onto the shell
 all at once; the **8-feature MVP cap** is the discipline lever. As a side-project this sits
 behind Igni / Boojy Audio / DELE — keep changes small and shippable.
