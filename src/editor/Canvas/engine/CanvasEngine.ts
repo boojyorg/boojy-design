@@ -254,6 +254,8 @@ export class CanvasEngine {
         if (layer.background) {
           created.ctx.fillStyle = PAGE_BACKGROUND
           created.ctx.fillRect(0, 0, DOC_WIDTH, DOC_HEIGHT)
+          // Trigger thumbnail so the Layers panel shows the white fill immediately.
+          this.notifyPixels(layer.id)
         }
       }
       node.image.visible(layer.visible)
@@ -278,6 +280,10 @@ export class CanvasEngine {
       this.nodes.get(layer.id)?.image.moveToTop()
     }
     this.page?.moveToBottom()
+    // The page rect is the structural white paper. Mirror the background layer's visibility
+    // so hiding it reveals transparency (checkerboard) like any other layer.
+    const bgLayer = layers.find((l) => l.background)
+    if (bgLayer && this.page) this.page.visible(bgLayer.visible)
     this.layer.batchDraw()
     this.renderOverlay()
   }

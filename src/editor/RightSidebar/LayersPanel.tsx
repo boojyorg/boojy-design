@@ -109,21 +109,19 @@ function SortableLayerRow({
           </button>
         )}
 
-        {!pinned && (
-          <button
-            type="button"
-            aria-label={layer.visible ? `Hide ${layer.name}` : `Show ${layer.name}`}
-            aria-pressed={layer.visible}
-            onClick={(e) => {
-              e.stopPropagation()
-              onToggle(layer.id)
-            }}
-            onDoubleClick={(e) => e.stopPropagation()}
-            className={cn("flex p-0.5", layer.visible ? "text-fg" : "text-fg-faint")}
-          >
-            {layer.visible ? <Eye size={16} /> : <EyeOff size={16} />}
-          </button>
-        )}
+        <button
+          type="button"
+          aria-label={layer.visible ? `Hide ${layer.name}` : `Show ${layer.name}`}
+          aria-pressed={layer.visible}
+          onClick={(e) => {
+            e.stopPropagation()
+            onToggle(layer.id)
+          }}
+          onDoubleClick={(e) => e.stopPropagation()}
+          className={cn("flex p-0.5", layer.visible ? "text-fg" : "text-fg-faint")}
+        >
+          {layer.visible ? <Eye size={16} /> : <EyeOff size={16} />}
+        </button>
 
         <div className="flex h-7 w-9 shrink-0 items-center justify-center overflow-hidden rounded border border-divider bg-panel">
           <LayerThumb layer={layer} />
