@@ -3,6 +3,7 @@ import {
   compositeOp,
   hardnessStops,
   interpolateStamps,
+  snapTo45,
   stampSpacing,
   strokeAlpha,
 } from "@/editor/Canvas/engine/brush"
@@ -45,6 +46,41 @@ describe("interpolateStamps", () => {
     const b = interpolateStamps({ x: 3, y: 0 }, { x: 6, y: 0 }, 5, a.carryOver)
     expect(b.points).toEqual([{ x: 5, y: 0 }])
     expect(b.carryOver).toBe(1)
+  })
+})
+
+describe("snapTo45", () => {
+  const o = { x: 0, y: 0 }
+
+  it("leaves a point already on an axis untouched", () => {
+    const p = snapTo45(o, { x: 10, y: 0 })
+    expect(p.x).toBeCloseTo(10)
+    expect(p.y).toBeCloseTo(0)
+  })
+
+  it("snaps a near-horizontal drag flat to the horizontal, preserving distance", () => {
+    // 10px out, 2px down → snaps to pure horizontal at the same length (~10.2px).
+    const p = snapTo45(o, { x: 10, y: 2 })
+    expect(p.y).toBeCloseTo(0)
+    expect(p.x).toBeCloseTo(Math.hypot(10, 2))
+  })
+
+  it("snaps to the nearest diagonal (45°)", () => {
+    // Mostly-diagonal drag → equal x and y at the same distance.
+    const p = snapTo45(o, { x: 10, y: 9 })
+    const len = Math.hypot(10, 9)
+    expect(p.x).toBeCloseTo(len * Math.SQRT1_2)
+    expect(p.y).toBeCloseTo(len * Math.SQRT1_2)
+  })
+
+  it("snaps near-vertical to the vertical axis", () => {
+    const p = snapTo45(o, { x: 1, y: -12 })
+    expect(p.x).toBeCloseTo(0)
+    expect(p.y).toBeCloseTo(-Math.hypot(1, 12))
+  })
+
+  it("returns the origin for a zero-length move", () => {
+    expect(snapTo45(o, { x: 0, y: 0 })).toEqual({ x: 0, y: 0 })
   })
 })
 

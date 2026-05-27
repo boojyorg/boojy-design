@@ -18,6 +18,21 @@ function lerp(from: Point, to: Point, t: number): Point {
   return { x: from.x + (to.x - from.x) * t, y: from.y + (to.y - from.y) * t }
 }
 
+/**
+ * Snap `to` onto the nearest 45° ray from `from`, keeping the same distance — so a
+ * Shift-held brush stroke locks to a straight horizontal / vertical / diagonal line.
+ * A zero-length move returns `from` unchanged.
+ */
+export function snapTo45(from: Point, to: Point): Point {
+  const dx = to.x - from.x
+  const dy = to.y - from.y
+  const length = Math.hypot(dx, dy)
+  if (length === 0) return { x: from.x, y: from.y }
+  const step = Math.PI / 4 // 45°
+  const angle = Math.round(Math.atan2(dy, dx) / step) * step
+  return { x: from.x + Math.cos(angle) * length, y: from.y + Math.sin(angle) * length }
+}
+
 export interface StampRun {
   /** Stamp centres to draw along this segment, in order. */
   points: Point[]
