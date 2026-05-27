@@ -163,7 +163,10 @@ without a canvas mock. Keep scope MVP-disciplined (see Roadmap).
 ## Roadmap (sequence intentionally — confirm scope before starting a new item)
 
 Rough order, MVP first — **shipped:** canvas engine (Konva, brush hot path) + raster
-brush/eraser + editable foreground colour + PNG export (menu / ⌘E) + image import (Import
+brush/eraser (**hold Shift** = straight line from the press point to the cursor, snapped to
+45° — `snapTo45` in `brush.ts`; `continueStroke` redraws the line each move like the shape
+preview, anchored at `strokeOrigin`; pointer-move-driven, so no stationary-Shift toggle) +
+editable foreground colour + PNG export (menu / ⌘E) + image import (Import
 image… / drag-drop, fit-centered new layer; **not undoable** — adds a layer outside the
 timeline) + layer ops (drag-reorder via dnd-kit, inline rename, duplicate-with-pixels, delete)
 + document model in Zustand (`documentStore`) + **unified undo/redo** (`undoStore`, a `Command`

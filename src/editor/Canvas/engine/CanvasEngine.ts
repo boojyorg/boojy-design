@@ -3,6 +3,7 @@ import {
   compositeOp,
   hardnessStops,
   interpolateStamps,
+  snapTo45,
   stampSpacing,
   strokeAlpha,
 } from "@/editor/Canvas/engine/brush"
@@ -122,6 +123,9 @@ export class CanvasEngine {
   private snapshotCtx: CanvasRenderingContext2D | null = null
   private target: RasterNode | null = null
   private lastPoint: Point | null = null
+  // The press point of a brush/eraser stroke in buffer-local space. Anchors the Shift
+  // straight-line: while Shift is held the stroke is redrawn as a line from here to the cursor.
+  private strokeOrigin: Point | null = null
   private carryOver = 0
   // Shape tool: the drag origin in buffer-local space. Non-null only mid shape-drag.
   private shapeStart: Point | null = null
@@ -311,6 +315,7 @@ export class CanvasEngine {
     this.strokeCtx.clearRect(0, 0, DOC_WIDTH, DOC_HEIGHT)
     this.carryOver = 0
     this.lastPoint = local
+    this.strokeOrigin = local
 
     if (this.brush.tool === "shape") {
       // No preview until the first drag move — a zero-size shape draws nothing.
@@ -363,6 +368,22 @@ export class CanvasEngine {
     }
 
     const spacing = stampSpacing(this.brush.size)
+
+    if (shiftKey && this.strokeOrigin) {
+      // Hold Shift: lock the stroke to a straight line from the press point to the cursor,
+      // snapped to 45°. Redraw from scratch each move (like the shape preview) so the line
+      // tracks the cursor; releasing Shift resumes freehand from here (lastPoint = cursor).
+      const end = snapTo45(this.strokeOrigin, local)
+      this.strokeCtx?.clearRect(0, 0, DOC_WIDTH, DOC_HEIGHT)
+      this.stampAt(this.strokeOrigin)
+      const line = interpolateStamps(this.strokeOrigin, end, spacing, 0)
+      for (const stamp of line.points) this.stampAt(stamp)
+      this.carryOver = 0
+      this.lastPoint = local
+      this.render()
+      return
+    }
+
     const run = interpolateStamps(this.lastPoint, local, spacing, this.carryOver)
     for (const stamp of run.points) this.stampAt(stamp)
     this.carryOver = run.carryOver
@@ -475,6 +496,7 @@ export class CanvasEngine {
 
     this.target = null
     this.lastPoint = null
+    this.strokeOrigin = null
     this.carryOver = 0
     this.shapeStart = null
     this.shiftDown = false

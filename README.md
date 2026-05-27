@@ -13,8 +13,9 @@ collapsible right sidebar.
 
 ## Features
 
-- **Paint** — raster brush & eraser in any colour (size · hardness · opacity); a flood-**fill**
-  bucket with a tolerance slider; an **eyedropper** that samples the colour under the cursor.
+- **Paint** — raster brush & eraser in any colour (size · hardness · opacity; **Shift** = a
+  straight line snapped to 45°); a flood-**fill** bucket with a tolerance slider; an
+  **eyedropper** that samples the colour under the cursor.
 - **Colours** — foreground + background swatches in the rail; **X** swaps them, **D** resets to
   black/white. (Painting always uses the foreground; background is a convenience slot.)
 - **Shapes** — drag a filled rectangle or ellipse onto the active layer (Shift → square/circle).
