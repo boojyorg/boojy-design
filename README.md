@@ -50,8 +50,13 @@ buffers, zoom-as-stage-scale), an editable **foreground colour** picker, **image
 (Import image… / drag-drop), **PNG export** (Design menu or ⌘E), **layer ops** — drag-to-reorder,
 inline rename, duplicate, delete — a **unified undo/redo** timeline (Cmd+Z / Cmd+Shift+Z)
 where strokes and every layer op share one history (including undo-delete with pixels intact),
-and **save/open** of `.design` documents (⌘S / ⌘O — JSON with each layer's pixels embedded as a
-base64 PNG). That rounds out the MVP paint loop. After MVP (v0.5+):
-Move tool + raster transforms, Text, eyedropper, blend modes. Non-MVP tools already appear in
-the rail, dimmed with a "coming in v0.5" tooltip. Sequenced, not piled on at once — the
-8-feature MVP cap is the discipline lever.
+**save/open** of `.design` documents (⌘S / ⌘O — JSON with each layer's pixels embedded as a
+base64 PNG), and a **Shape tool** — drag to draw a filled rectangle or ellipse on the active
+layer (Shift constrains to a square/circle), undoable like any stroke; the rect/ellipse picker
+floats in a panel beside the tool rail, and the rail icon shows the chosen shape. That rounds out the MVP
+paint loop, plus an **eyedropper** (press `I`) that samples a colour from the canvas into the
+foreground and snaps back to your previous tool, and a **fill** bucket (press `G`) that
+flood-fills the clicked region of the active layer with the foreground (Tolerance slider for
+match looseness). After MVP (v0.5+): Move tool + raster transforms, Text, blend modes.
+The remaining non-MVP tools (Move, Text) appear in the rail, dimmed with a "coming in v0.5"
+tooltip. Sequenced, not piled on at once — the 8-feature MVP cap is the discipline lever.

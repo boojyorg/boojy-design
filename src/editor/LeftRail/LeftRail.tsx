@@ -1,5 +1,6 @@
+import { Circle, Square } from "lucide-react"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
-import type { ToolId } from "@/editor/types"
+import type { ToolId, VectorKind } from "@/editor/types"
 import { cn } from "@/lib/cn"
 import { TOOLS } from "@/lib/tools"
 import { ColorSwatches } from "./ColorSwatches"
@@ -7,18 +8,27 @@ import { ColorSwatches } from "./ColorSwatches"
 interface LeftRailProps {
   activeTool: ToolId
   foreground: string
+  /** The Shape tool's rail icon morphs to show this (square / circle). */
+  shapeKind: VectorKind
   onSelectTool: (tool: ToolId) => void
   onForeground: (color: string) => void
 }
 
-export function LeftRail({ activeTool, foreground, onSelectTool, onForeground }: LeftRailProps) {
+export function LeftRail({
+  activeTool,
+  foreground,
+  shapeKind,
+  onSelectTool,
+  onForeground,
+}: LeftRailProps) {
   return (
     <nav
       aria-label="Tools"
       className="flex w-14 shrink-0 flex-col items-center gap-[3px] border-divider border-r bg-chrome py-2.5"
     >
       {TOOLS.map((tool) => {
-        const Icon = tool.icon
+        // The Shape button reflects the chosen primitive; every other tool keeps its icon.
+        const Icon = tool.id === "shape" ? (shapeKind === "ellipse" ? Circle : Square) : tool.icon
         const active = tool.id === activeTool
         const label = tool.mvp
           ? `${tool.label} (${tool.shortcut})`

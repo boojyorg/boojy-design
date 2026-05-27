@@ -44,6 +44,30 @@ describe("editable foreground colour", () => {
     expect(result.current[0].foreground).toBe("#123456")
   })
 
+  it("eyedropper remembers the previous tool and snaps back on sample", () => {
+    const { result } = renderHook(() => useEditorState())
+    const dispatch = () => result.current[1]
+
+    // Enter the eyedropper from Brush → previousTool recorded.
+    act(() => dispatch()({ type: "setTool", tool: "eyedropper" }))
+    expect(result.current[0].activeTool).toBe("eyedropper")
+    expect(result.current[0].previousTool).toBe("brush")
+
+    // Sampling sets the colour and returns to the pre-eyedropper tool.
+    act(() => dispatch()({ type: "applySampledColor", color: "#00FF00" }))
+    expect(result.current[0].foreground).toBe("#00FF00")
+    expect(result.current[0].activeTool).toBe("brush")
+  })
+
+  it("setFillTolerance updates the fill tolerance in state", () => {
+    const { result } = renderHook(() => useEditorState())
+    expect(result.current[0].fillTolerance).toBe(20)
+
+    act(() => result.current[1]({ type: "setFillTolerance", value: 50 }))
+
+    expect(result.current[0].fillTolerance).toBe(50)
+  })
+
   it("opens the colour picker from the brush colour chip", async () => {
     const user = userEvent.setup()
     render(<EditorV1 />)

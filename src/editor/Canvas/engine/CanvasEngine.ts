@@ -6,8 +6,11 @@ import {
   stampSpacing,
   strokeAlpha,
 } from "@/editor/Canvas/engine/brush"
+import { hexToRgb, rgbaToHex } from "@/editor/Canvas/engine/color"
 import { drawImageContain } from "@/editor/Canvas/engine/draw"
+import { floodFill } from "@/editor/Canvas/engine/fill"
 import { flattenLayers } from "@/editor/Canvas/engine/flatten"
+import { drawEllipse, drawRect, normalizeRect } from "@/editor/Canvas/engine/shape"
 import {
   type BrushParams,
   DOC_HEIGHT,
@@ -82,6 +85,11 @@ export class CanvasEngine {
   private target: RasterNode | null = null
   private lastPoint: Point | null = null
   private carryOver = 0
+  // Shape tool: the drag origin in doc space. Non-null only mid shape-drag.
+  private shapeStart: Point | null = null
+  // Latest Shift state for the shape constraint — updated by pointer moves *and* by
+  // raw Shift key events, so the preview tracks Shift even while the pointer is still.
+  private shiftDown = false
 
   mount(container: HTMLDivElement) {
     // Capability guard: jsdom's getContext returns null (or throws). Bail before
@@ -185,7 +193,8 @@ export class CanvasEngine {
 
   beginStroke(clientX: number, clientY: number) {
     if (!this.stage) return
-    if (this.brush.tool !== "brush" && this.brush.tool !== "eraser") return
+    if (this.brush.tool !== "brush" && this.brush.tool !== "eraser" && this.brush.tool !== "shape")
+      return
 
     const target = this.nodes.get(this.activeLayerId)
     if (!target?.image.visible()) return
@@ -202,14 +211,27 @@ export class CanvasEngine {
     this.carryOver = 0
     this.lastPoint = point
 
+    if (this.brush.tool === "shape") {
+      // No preview until the first drag move — a zero-size shape draws nothing.
+      this.shapeStart = point
+      return
+    }
+
     this.stampAt(point)
     this.render()
   }
 
-  continueStroke(clientX: number, clientY: number) {
+  continueStroke(clientX: number, clientY: number, shiftKey = false) {
     if (!this.target || !this.lastPoint) return
     const point = this.screenToDoc(clientX, clientY)
     if (!point) return
+
+    if (this.brush.tool === "shape") {
+      this.shiftDown = shiftKey
+      this.lastPoint = point
+      this.drawShapePreview()
+      return
+    }
 
     const spacing = stampSpacing(this.brush.size)
     const run = interpolateStamps(this.lastPoint, point, spacing, this.carryOver)
@@ -219,14 +241,47 @@ export class CanvasEngine {
     this.render()
   }
 
+  /** Toggle the Shift (square/circle) constraint mid-drag and re-render — lets the preview
+   *  follow Shift even when the pointer is stationary (no pointer event fires then). No-ops
+   *  unless a shape drag is in progress. */
+  setShapeConstraint(shiftDown: boolean) {
+    if (this.brush.tool !== "shape" || !this.shapeStart || shiftDown === this.shiftDown) return
+    this.shiftDown = shiftDown
+    this.drawShapePreview()
+  }
+
+  // Redraw the live shape from scratch: clear the stroke buffer, fill the rect/ellipse
+  // (from shapeStart → lastPoint under the current Shift constraint), then composite
+  // (snapshot + stroke-at-opacity) via render(). Clearing first means a solid shape never
+  // double-darkens, same guarantee as the brush path.
+  private drawShapePreview() {
+    if (!this.shapeStart || !this.lastPoint || !this.strokeCtx) return
+    const rect = normalizeRect(this.shapeStart, this.lastPoint, this.shiftDown)
+    this.strokeCtx.clearRect(0, 0, DOC_WIDTH, DOC_HEIGHT)
+    if (this.brush.shapeKind === "ellipse") drawEllipse(this.strokeCtx, rect, this.brush.color)
+    else drawRect(this.strokeCtx, rect, this.brush.color)
+    this.render()
+  }
+
   endStroke() {
     const target = this.target
     if (!target) return
     this.render() // bake the final state into the layer buffer
 
+    // A shape click with no drag (zero width/height) paints nothing — skip the commit
+    // so no empty no-op lands on the undo timeline.
+    let emptyShape = false
+    if (this.brush.tool === "shape") {
+      if (!this.shapeStart || !this.lastPoint) emptyShape = true
+      else {
+        const r = normalizeRect(this.shapeStart, this.lastPoint, false)
+        emptyShape = r.w === 0 || r.h === 0
+      }
+    }
+
     // Emit the stroke for the unified timeline: before = pre-stroke snapshot,
     // after = the baked result. undoStore decides where it sits in history.
-    if (this.snapshotCanvas) {
+    if (this.snapshotCanvas && !emptyShape) {
       this.onStrokeCommitted?.({
         layerId: this.strokeLayerId,
         before: this.cloneCanvas(this.snapshotCanvas),
@@ -237,6 +292,8 @@ export class CanvasEngine {
     this.target = null
     this.lastPoint = null
     this.carryOver = 0
+    this.shapeStart = null
+    this.shiftDown = false
   }
 
   /** Subscribe to committed strokes (the timeline records each as an undoable command). */
@@ -288,6 +345,67 @@ export class CanvasEngine {
     out.toBlob((blob) => {
       if (blob) downloadBlob(blob, toExportFilename("Untitled"))
     }, "image/png")
+  }
+
+  /** Sample the visible composited colour under a screen point → "#RRGGBB", or null if the
+   *  point is outside the page (or there's no 2D context, e.g. jsdom). Flattens the layer
+   *  stack onto the white page exactly like exportPNG, so "what you click is what you get". */
+  sampleColorAt(clientX: number, clientY: number): string | null {
+    const point = this.screenToDoc(clientX, clientY)
+    if (!point) return null
+    const x = Math.floor(point.x)
+    const y = Math.floor(point.y)
+    if (x < 0 || y < 0 || x >= DOC_WIDTH || y >= DOC_HEIGHT) return null
+
+    const out = document.createElement("canvas")
+    out.width = DOC_WIDTH
+    out.height = DOC_HEIGHT
+    let ctx: CanvasRenderingContext2D | null = null
+    try {
+      ctx = out.getContext("2d")
+    } catch {
+      ctx = null
+    }
+    if (!ctx) return null
+
+    flattenLayers(ctx, this.layers, (id) => this.nodes.get(id)?.canvas, {
+      background: "white",
+      backgroundColor: PAGE_BACKGROUND,
+      width: DOC_WIDTH,
+      height: DOC_HEIGHT,
+    })
+
+    const d = ctx.getImageData(x, y, 1, 1).data
+    return rgbaToHex(d[0] ?? 0, d[1] ?? 0, d[2] ?? 0)
+  }
+
+  /** Flood-fill the active layer from a screen point with the foreground colour. Contiguous,
+   *  active-layer-only, undoable via the same commit path as a stroke. No-op off-page or on a
+   *  hidden layer. */
+  fillAt(clientX: number, clientY: number) {
+    if (!this.stage) return
+    const target = this.nodes.get(this.activeLayerId)
+    if (!target?.image.visible()) return
+    const point = this.screenToDoc(clientX, clientY)
+    if (!point) return
+    const x = Math.floor(point.x)
+    const y = Math.floor(point.y)
+    if (x < 0 || y < 0 || x >= DOC_WIDTH || y >= DOC_HEIGHT) return
+
+    const before = this.cloneCanvas(target.canvas)
+    const image = target.ctx.getImageData(0, 0, DOC_WIDTH, DOC_HEIGHT)
+    const threshold = Math.round(((this.brush.tolerance ?? 0) / 100) * 255)
+    // Blend the fill under the soft (anti-aliased) edge so fills don't leave a fringe ring;
+    // the 0<alpha<255 gate halts at the stroke core/exterior, so this is just a safety cap.
+    floodFill(image.data, DOC_WIDTH, DOC_HEIGHT, x, y, hexToRgb(this.brush.color), threshold, 16)
+    target.ctx.putImageData(image, 0, 0)
+    this.layer?.batchDraw()
+
+    this.onStrokeCommitted?.({
+      layerId: this.activeLayerId,
+      before,
+      after: this.cloneCanvas(target.canvas),
+    })
   }
 
   /** Draw a decoded image into the active layer, fit-centered. Pixels only — no history

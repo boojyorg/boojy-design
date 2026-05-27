@@ -1,7 +1,7 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef } from "react"
 import { CanvasEngine } from "@/editor/Canvas/engine/CanvasEngine"
 import { useUndoStore } from "@/editor/state/undoStore"
-import type { Layer, ToolId } from "@/editor/types"
+import type { Layer, ToolId, VectorKind } from "@/editor/types"
 import { toLayerName } from "@/lib/filename"
 import { decodeImageFile } from "@/lib/loadImage"
 
@@ -25,11 +25,15 @@ interface CanvasStageProps {
   hardness: number
   opacity: number
   foreground: string
+  shapeKind: VectorKind
+  fillTolerance: number
   zoom: number
   layers: Layer[]
   activeLayerId: string
   /** Ask the chrome to add an image-typed layer (the document store owns layer metadata). */
   onRequestImageLayer: (name: string) => void
+  /** Eyedropper picked a colour (visible composite under the cursor). */
+  onSampleColor: (hex: string) => void
 }
 
 /** The narrow imperative surface the engine exposes across the seam. */
@@ -88,7 +92,16 @@ export const CanvasStage = forwardRef<CanvasStageHandle, CanvasStageProps>(
       const engine = new CanvasEngine()
       engine.mount(host)
       engineRef.current = engine
+      // Track Shift directly so the shape preview follows the square/circle constraint
+      // even when the pointer is still (no pointer event fires then). No-ops off a drag.
+      const onShift = (e: KeyboardEvent) => {
+        if (e.key === "Shift") engine.setShapeConstraint(e.shiftKey)
+      }
+      window.addEventListener("keydown", onShift)
+      window.addEventListener("keyup", onShift)
       return () => {
+        window.removeEventListener("keydown", onShift)
+        window.removeEventListener("keyup", onShift)
         engine.unmount()
         engineRef.current = null
       }
@@ -111,10 +124,22 @@ export const CanvasStage = forwardRef<CanvasStageHandle, CanvasStageProps>(
         tool: props.tool,
         color: props.foreground,
         size: props.brushSize,
-        opacity: props.opacity,
+        // Shapes fill solid — the Shape panel has no opacity control, so don't
+        // inherit the brush's last opacity. Use layer opacity for translucency.
+        opacity: props.tool === "shape" ? 100 : props.opacity,
         hardness: props.hardness,
+        shapeKind: props.shapeKind,
+        tolerance: props.fillTolerance,
       })
-    }, [props.tool, props.foreground, props.brushSize, props.opacity, props.hardness])
+    }, [
+      props.tool,
+      props.foreground,
+      props.brushSize,
+      props.opacity,
+      props.hardness,
+      props.shapeKind,
+      props.fillTolerance,
+    ])
 
     useEffect(() => {
       const engine = engineRef.current
@@ -139,7 +164,8 @@ export const CanvasStage = forwardRef<CanvasStageHandle, CanvasStageProps>(
       engineRef.current?.setZoom(props.zoom)
     }, [props.zoom])
 
-    const isPaintTool = props.tool === "brush" || props.tool === "eraser"
+    const isPaintTool = props.tool === "brush" || props.tool === "eraser" || props.tool === "shape"
+    const showCrosshair = isPaintTool || props.tool === "eyedropper" || props.tool === "fill"
 
     return (
       <div
@@ -152,12 +178,21 @@ export const CanvasStage = forwardRef<CanvasStageHandle, CanvasStageProps>(
         <div
           ref={hostRef}
           className="absolute inset-0"
-          style={{ cursor: isPaintTool ? "crosshair" : "default", touchAction: "none" }}
+          style={{ cursor: showCrosshair ? "crosshair" : "default", touchAction: "none" }}
           onPointerDown={(e) => {
+            if (props.tool === "eyedropper") {
+              const hex = engineRef.current?.sampleColorAt(e.clientX, e.clientY)
+              if (hex) props.onSampleColor(hex)
+              return
+            }
+            if (props.tool === "fill") {
+              engineRef.current?.fillAt(e.clientX, e.clientY)
+              return
+            }
             e.currentTarget.setPointerCapture(e.pointerId)
             engineRef.current?.beginStroke(e.clientX, e.clientY)
           }}
-          onPointerMove={(e) => engineRef.current?.continueStroke(e.clientX, e.clientY)}
+          onPointerMove={(e) => engineRef.current?.continueStroke(e.clientX, e.clientY, e.shiftKey)}
           onPointerUp={(e) => {
             engineRef.current?.endStroke()
             if (e.currentTarget.hasPointerCapture(e.pointerId)) {

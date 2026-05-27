@@ -13,12 +13,14 @@ interface TopBarProps {
   hardness: number
   opacity: number
   foreground: string
+  fillTolerance: number
   zoom: number
   rightCollapsed: boolean
   onBrushSize: (v: number) => void
   onHardness: (v: number) => void
   onOpacity: (v: number) => void
   onForeground: (color: string) => void
+  onFillTolerance: (v: number) => void
   onZoomIn: () => void
   onZoomOut: () => void
   onToggleRight: () => void
@@ -75,10 +77,12 @@ export function TopBar(props: TopBarProps) {
           hardness={props.hardness}
           opacity={props.opacity}
           foreground={props.foreground}
+          fillTolerance={props.fillTolerance}
           onBrushSize={props.onBrushSize}
           onHardness={props.onHardness}
           onOpacity={props.onOpacity}
           onForeground={props.onForeground}
+          onFillTolerance={props.onFillTolerance}
         />
       </div>
 

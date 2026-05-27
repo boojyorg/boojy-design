@@ -24,13 +24,44 @@ describe("EditorV1 shell", () => {
     expect(within(props).getByText("Color")).toBeInTheDocument()
   })
 
-  it("swaps to Shape props (Rectangle/Ellipse + Fill) when Shape is picked", () => {
+  it("shows only Fill in the top bar for Shape (the rect/ellipse picker moved to the rail)", () => {
     renderEditor()
     fireEvent.click(screen.getByRole("button", { name: "Shape (R)" }))
     const props = screen.getByTestId("tool-props")
-    expect(within(props).getByRole("button", { name: "Rectangle" })).toBeInTheDocument()
-    expect(within(props).getByRole("button", { name: "Ellipse" })).toBeInTheDocument()
     expect(within(props).getByText("Fill")).toBeInTheDocument()
+    expect(within(props).queryByRole("button", { name: "Rectangle" })).not.toBeInTheDocument()
+    expect(within(props).queryByRole("button", { name: "Ellipse" })).not.toBeInTheDocument()
+  })
+
+  it("reveals the shape flyout only while the Shape tool is active", () => {
+    renderEditor()
+    expect(screen.queryByTestId("shape-flyout")).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole("button", { name: "Shape (R)" }))
+    const flyout = screen.getByTestId("shape-flyout")
+    expect(within(flyout).getByRole("button", { name: "Rectangle" })).toBeInTheDocument()
+    expect(within(flyout).getByRole("button", { name: "Ellipse" })).toBeInTheDocument()
+
+    // Leaving the tool hides it again.
+    fireEvent.click(screen.getByRole("button", { name: "Eraser (E)" }))
+    expect(screen.queryByTestId("shape-flyout")).not.toBeInTheDocument()
+  })
+
+  it("toggles the shape kind from the flyout (Rectangle ⇄ Ellipse)", () => {
+    renderEditor()
+    fireEvent.click(screen.getByRole("button", { name: "Shape (R)" }))
+    const flyout = screen.getByTestId("shape-flyout")
+    const rect = within(flyout).getByRole("button", { name: "Rectangle" })
+    const ellipse = within(flyout).getByRole("button", { name: "Ellipse" })
+
+    // Defaults to Rectangle.
+    expect(rect).toHaveAttribute("aria-pressed", "true")
+    expect(ellipse).toHaveAttribute("aria-pressed", "false")
+
+    // Picking Ellipse round-trips through the reducer.
+    fireEvent.click(ellipse)
+    expect(ellipse).toHaveAttribute("aria-pressed", "true")
+    expect(rect).toHaveAttribute("aria-pressed", "false")
   })
 
   it("shows Eraser props without a Color control", () => {
@@ -45,6 +76,40 @@ describe("EditorV1 shell", () => {
     renderEditor()
     fireEvent.click(screen.getByRole("button", { name: "Hand (H)" }))
     expect(screen.getByText(/Drag to pan · scroll to zoom/)).toBeInTheDocument()
+  })
+
+  it("selects the Eyedropper and shows the pick-a-colour hint", () => {
+    renderEditor()
+    fireEvent.click(screen.getByRole("button", { name: "Eyedropper (I)" }))
+    expect(screen.getByRole("button", { name: "Eyedropper (I)" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    )
+    expect(screen.getByTestId("tool-props")).toHaveTextContent("Click the canvas to pick a colour")
+  })
+
+  it("selects the Eyedropper with the I shortcut", () => {
+    renderEditor()
+    fireEvent.keyDown(document.body, { key: "i" })
+    expect(screen.getByRole("button", { name: "Eyedropper (I)" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    )
+  })
+
+  it("selects the Fill tool (click or G) and shows Tolerance + Color props", () => {
+    renderEditor()
+    fireEvent.click(screen.getByRole("button", { name: "Fill (G)" }))
+    expect(screen.getByRole("button", { name: "Fill (G)" })).toHaveAttribute("aria-pressed", "true")
+    const props = screen.getByTestId("tool-props")
+    expect(within(props).getByText("Tolerance")).toBeInTheDocument()
+    expect(within(props).getByText("Color")).toBeInTheDocument()
+  })
+
+  it("selects the Fill tool with the G shortcut", () => {
+    renderEditor()
+    fireEvent.keyDown(document.body, { key: "g" })
+    expect(screen.getByRole("button", { name: "Fill (G)" })).toHaveAttribute("aria-pressed", "true")
   })
 
   it("disables non-MVP tools (Move, Text) with a coming-in-v0.5 affordance", () => {

@@ -1,4 +1,12 @@
-export type ToolId = "select" | "brush" | "eraser" | "shape" | "text" | "hand"
+export type ToolId =
+  | "select"
+  | "brush"
+  | "eraser"
+  | "fill"
+  | "shape"
+  | "eyedropper"
+  | "text"
+  | "hand"
 
 export type LayerType = "raster" | "vector" | "image"
 export type VectorKind = "rect" | "ellipse"

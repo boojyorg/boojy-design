@@ -3,6 +3,7 @@ import { TooltipProvider } from "@/components/ui/tooltip"
 import { CanvasStage, type CanvasStageHandle } from "@/editor/Canvas/CanvasStage"
 import { DOC_HEIGHT, DOC_WIDTH } from "@/editor/Canvas/engine/types"
 import { LeftRail } from "@/editor/LeftRail/LeftRail"
+import { ShapeFlyout } from "@/editor/LeftRail/ShapeFlyout"
 import { RightSidebar } from "@/editor/RightSidebar/RightSidebar"
 import {
   type PixelPort,
@@ -130,12 +131,14 @@ export function EditorV1() {
           hardness={state.hardness}
           opacity={state.opacity}
           foreground={state.foreground}
+          fillTolerance={state.fillTolerance}
           zoom={state.zoom}
           rightCollapsed={state.rightCollapsed}
           onBrushSize={(value) => dispatch({ type: "setBrushSize", value })}
           onHardness={(value) => dispatch({ type: "setHardness", value })}
           onOpacity={(value) => dispatch({ type: "setOpacity", value })}
           onForeground={(color) => dispatch({ type: "setForeground", color })}
+          onFillTolerance={(value) => dispatch({ type: "setFillTolerance", value })}
           onZoomIn={() => dispatch({ type: "nudgeZoom", delta: 25 })}
           onZoomOut={() => dispatch({ type: "nudgeZoom", delta: -25 })}
           onToggleRight={() => dispatch({ type: "toggleRight" })}
@@ -149,13 +152,22 @@ export function EditorV1() {
           canRedo={canRedo}
         />
 
-        <div className="flex min-h-0 flex-1">
+        <div className="relative flex min-h-0 flex-1">
           <LeftRail
             activeTool={state.activeTool}
             foreground={state.foreground}
+            shapeKind={state.shapeKind}
             onSelectTool={(tool) => dispatch({ type: "setTool", tool })}
             onForeground={(color) => dispatch({ type: "setForeground", color })}
           />
+          {state.activeTool === "shape" && (
+            <div className="-translate-y-1/2 absolute top-1/2 left-[66px] z-20">
+              <ShapeFlyout
+                shapeKind={state.shapeKind}
+                onShapeKind={(kind) => dispatch({ type: "setShapeKind", kind })}
+              />
+            </div>
+          )}
           <CanvasStage
             ref={stageRef}
             tool={state.activeTool}
@@ -163,10 +175,13 @@ export function EditorV1() {
             hardness={state.hardness}
             opacity={state.opacity}
             foreground={state.foreground}
+            shapeKind={state.shapeKind}
+            fillTolerance={state.fillTolerance}
             zoom={state.zoom}
             layers={layers}
             activeLayerId={activeLayerId}
             onRequestImageLayer={(name) => addLayer(name, "image")}
+            onSampleColor={(hex) => dispatch({ type: "applySampledColor", color: hex })}
           />
           <RightSidebar
             collapsed={state.rightCollapsed}
