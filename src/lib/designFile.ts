@@ -44,18 +44,24 @@ export interface ParsedDesign {
   transforms: { layerId: string; transform: Transform }[]
 }
 
-const isIdentity = (t: Transform) => t.x === 0 && t.y === 0 && t.scale === 1 && t.rotation === 0
+const isIdentity = (t: Transform) =>
+  t.x === 0 && t.y === 0 && t.scaleX === 1 && t.scaleY === 1 && t.rotation === 0
 
-/** Coerce an unknown to a Transform, or null if it isn't one (validates on open). */
+/** Coerce an unknown to a Transform, or null if it isn't one (validates on open). Accepts both the
+ *  current `{scaleX, scaleY}` shape and a legacy uniform `{scale}` (→ both axes). */
 function asTransform(v: unknown): Transform | null {
   if (typeof v !== "object" || v === null) return null
   const t = v as Record<string, unknown>
-  return typeof t.x === "number" &&
-    typeof t.y === "number" &&
-    typeof t.scale === "number" &&
-    typeof t.rotation === "number"
-    ? { x: t.x, y: t.y, scale: t.scale, rotation: t.rotation }
-    : null
+  if (typeof t.x !== "number" || typeof t.y !== "number" || typeof t.rotation !== "number") {
+    return null
+  }
+  if (typeof t.scaleX === "number" && typeof t.scaleY === "number") {
+    return { x: t.x, y: t.y, scaleX: t.scaleX, scaleY: t.scaleY, rotation: t.rotation }
+  }
+  if (typeof t.scale === "number") {
+    return { x: t.x, y: t.y, scaleX: t.scale, scaleY: t.scale, rotation: t.rotation }
+  }
+  return null
 }
 
 /** Serialise the current document to a `.design` JSON string. `getPixels` reads a layer's
@@ -114,7 +120,10 @@ export function parseDesign(json: string): ParsedDesign {
       if (t) return { layerId: l.id, transform: t }
       // Legacy translate-only offset → a transform with unit scale / no rotation.
       if (typeof l.offsetX === "number" && typeof l.offsetY === "number") {
-        return { layerId: l.id, transform: { x: l.offsetX, y: l.offsetY, scale: 1, rotation: 0 } }
+        return {
+          layerId: l.id,
+          transform: { x: l.offsetX, y: l.offsetY, scaleX: 1, scaleY: 1, rotation: 0 },
+        }
       }
       return null
     })

@@ -229,7 +229,9 @@ export const CanvasStage = forwardRef<CanvasStageHandle, CanvasStageProps>(
 
     const isPaintTool = props.tool === "brush" || props.tool === "eraser" || props.tool === "shape"
     const showCrosshair = isPaintTool || props.tool === "eyedropper" || props.tool === "fill"
-    const cursor = props.tool === "select" ? "move" : showCrosshair ? "crosshair" : "default"
+    // For Move, the engine drives the container cursor on hover (handle-aware); for the rest,
+    // a static cursor here. Leaving it undefined for Move lets the engine's imperative set stick.
+    const cursor = props.tool === "select" ? undefined : showCrosshair ? "crosshair" : "default"
 
     return (
       <div
@@ -256,7 +258,11 @@ export const CanvasStage = forwardRef<CanvasStageHandle, CanvasStageProps>(
             e.currentTarget.setPointerCapture(e.pointerId)
             engineRef.current?.beginStroke(e.clientX, e.clientY)
           }}
-          onPointerMove={(e) => engineRef.current?.continueStroke(e.clientX, e.clientY, e.shiftKey)}
+          onPointerMove={(e) => {
+            engineRef.current?.continueStroke(e.clientX, e.clientY, e.shiftKey)
+            // Move tool: update the handle-aware cursor on hover (no-ops mid-drag).
+            if (props.tool === "select") engineRef.current?.pointerHover(e.clientX, e.clientY)
+          }}
           onPointerUp={(e) => {
             engineRef.current?.endStroke()
             if (e.currentTarget.hasPointerCapture(e.pointerId)) {

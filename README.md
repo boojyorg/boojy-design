@@ -57,13 +57,14 @@ floats in a panel beside the tool rail, and the rail icon shows the chosen shape
 paint loop, plus an **eyedropper** (press `I`) that samples a colour from the canvas into the
 foreground and snaps back to your previous tool, and a **fill** bucket (press `G`) that
 flood-fills the clicked region of the active layer with the foreground (Tolerance slider for
-match looseness), and a **Move tool** (press `V`) — a **free transform** that moves, **scales**
-(corner handles, proportional) and **rotates** (a grip; Shift snaps to 15°) the active layer,
-**non-destructively**: it changes where the layer is *drawn* without touching its pixels, so
-dragging off the page edge hides the overflow but keeps it, and undo/redo step through each
-transform. Arrow keys nudge (10px holding Shift); export and `.design` files honour the transform.
+match looseness), and a **Move tool** (press `V`) — a **free transform** with an 8-handle box:
+**corners** scale width+height (proportional; Shift = free), **edges** scale one axis, a **grip**
+rotates (Shift snaps to 15°), and dragging inside moves. It's **non-destructive** — it changes
+where the layer is *drawn* without touching its pixels, so dragging off the page hides the overflow
+but keeps it, and undo/redo step through each transform. Context-aware cursors (rotation-aware);
+arrow keys nudge (10px holding Shift); export and `.design` files honour the transform.
 The **Layers panel shows live thumbnails** — each layer's content, trimmed to fill the box,
-refreshing as you edit (blank layers read empty). After MVP (v0.5+): non-uniform scale/skew,
+refreshing as you edit (blank layers read empty). After MVP (v0.5+): skew/flip,
 Text, blend modes. The lone
 non-MVP tool (Text) appears in the rail, dimmed with a "coming in v0.5" tooltip. Sequenced,
 not piled on at once — the 8-feature MVP cap is the discipline lever.

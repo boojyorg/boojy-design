@@ -22,7 +22,7 @@ const ids = () => useDocumentStore.getState().layers.map((l) => l.id)
 const fakePort = (canvas: HTMLCanvasElement | null): PixelPort => ({
   captureLayerPixels: vi.fn(() => canvas),
   stashPixelRestore: vi.fn(),
-  getLayerTransform: vi.fn(() => ({ x: 0, y: 0, scale: 1, rotation: 0 })),
+  getLayerTransform: vi.fn(() => ({ x: 0, y: 0, scaleX: 1, scaleY: 1, rotation: 0 })),
   setLayerTransform: vi.fn(),
 })
 
@@ -98,7 +98,7 @@ describe("runDuplicateLayer", () => {
   it("copies the source layer's transform onto the duplicate (lands in place)", () => {
     const { record } = recorder()
     const port = fakePort(null)
-    const transform = { x: 12, y: -4, scale: 1.5, rotation: 0.2 }
+    const transform = { x: 12, y: -4, scaleX: 1.5, scaleY: 0.7, rotation: 0.2 }
     vi.mocked(port.getLayerTransform).mockReturnValue(transform)
 
     runDuplicateLayer("l3", "dup1", port, record)

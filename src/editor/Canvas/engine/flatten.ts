@@ -37,7 +37,7 @@ export function flattenLayers(
     ctx.save()
     ctx.translate(t.x, t.y)
     ctx.rotate(t.rotation)
-    ctx.scale(t.scale, t.scale)
+    ctx.scale(t.scaleX, t.scaleY)
     ctx.drawImage(source, 0, 0)
     ctx.restore()
   }

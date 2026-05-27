@@ -15,10 +15,12 @@ import { type Bounds, contentBounds } from "@/editor/Canvas/engine/thumbnail"
 import {
   apply,
   boxCorners,
+  HANDLES,
   IDENTITY,
   invert,
+  resize,
+  resizeCursor,
   rotateAbout,
-  scaleAbout,
   type Transform,
   translateBy,
 } from "@/editor/Canvas/engine/transform"
@@ -57,11 +59,12 @@ export interface MoveCommit {
   after: Transform
 }
 
-/** Which free-transform gesture a Move drag is performing, plus its fixed pivot in doc space. */
+/** Which free-transform gesture a Move drag is performing. `scale` carries the handle index
+ *  (0–7, clockwise from Top); `rotate` carries the fixed centre in doc space. */
 type Gesture =
   | { kind: "move" }
-  | { kind: "scale"; anchor: { x: number; y: number } }
-  | { kind: "rotate"; centre: { x: number; y: number } }
+  | { kind: "scale"; index: number }
+  | { kind: "rotate"; centre: Point }
 
 const DEFAULT_BRUSH: BrushParams = {
   tool: "brush",
@@ -280,11 +283,17 @@ export class CanvasEngine {
     this.strokeLayerId = this.activeLayerId
 
     if (this.brush.tool === "select") {
-      // Free transform: a handle under the press picks scale/rotate, otherwise the drag moves the
-      // layer. All non-destructive — only the layer's transform changes, never its pixels.
+      // Free transform: a handle picks scale/rotate, inside the box moves, outside is a no-op.
+      // All non-destructive — only the layer's transform changes, never its pixels.
+      const gesture = this.hitTest(point)
+      if (!gesture) {
+        this.target = null
+        return
+      }
       this.moveStart = point
       this.moveStartTransform = this.getLayerTransform(this.activeLayerId)
-      this.gesture = this.hitTestHandle(point) ?? { kind: "move" }
+      this.gesture = gesture
+      this.setDragCursor(gesture)
       return
     }
 
@@ -318,7 +327,10 @@ export class CanvasEngine {
       const start = this.moveStartTransform
       let next: Transform
       if (this.gesture.kind === "scale") {
-        next = scaleAbout(start, this.gesture.anchor, this.moveStart, point)
+        const box = this.activeContentBox()
+        if (!box) return
+        // Corners are proportional unless Shift; edges are always single-axis (resize ignores it).
+        next = resize(start, box, this.gesture.index, point, { proportional: !shiftKey })
       } else if (this.gesture.kind === "rotate") {
         next = rotateAbout(
           start,
@@ -418,7 +430,8 @@ export class CanvasEngine {
       const changed =
         after.x !== before.x ||
         after.y !== before.y ||
-        after.scale !== before.scale ||
+        after.scaleX !== before.scaleX ||
+        after.scaleY !== before.scaleY ||
         after.rotation !== before.rotation
       if (this.moveStart && changed) {
         this.onMoveCommitted?.({ layerId: this.strokeLayerId, before, after })
@@ -426,6 +439,7 @@ export class CanvasEngine {
       this.target = null
       this.moveStart = null
       this.gesture = null
+      if (this.container) this.container.style.cursor = "default" // next hover re-sets it
       return
     }
 
@@ -773,7 +787,7 @@ export class CanvasEngine {
    *  pivoting about the buffer origin so it matches `apply()` in transform.ts. */
   private applyTransformToNode(node: RasterNode, t: Transform) {
     node.image.position({ x: t.x, y: t.y })
-    node.image.scale({ x: t.scale, y: t.scale })
+    node.image.scale({ x: t.scaleX, y: t.scaleY })
     node.image.rotation((t.rotation * 180) / Math.PI)
   }
 
@@ -824,25 +838,48 @@ export class CanvasEngine {
     return { x: topCentre.x + up.x * d, y: topCentre.y + up.y * d }
   }
 
-  /** Which transform handle (if any) the doc-space press is on — scale (corner) or rotate (grip). */
-  private hitTestHandle(pressDoc: Point): Gesture | null {
+  /** Which gesture a doc-space press starts: the rotate grip, a scale handle (0–7), a move (inside
+   *  the box) or null (outside). Grip first (it sits outside the box), then handles, then interior. */
+  private hitTest(pressDoc: Point): Gesture | null {
     const box = this.activeContentBox()
     if (!box) return null
     const t = this.getLayerTransform(this.activeLayerId)
-    const corners = boxCorners(box).map((c) => apply(t, c))
     const r = HANDLE_HIT / this.view().scale
-    const near = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.y - b.y) <= r
-    for (let i = 0; i < 4; i++) {
-      const c = corners[i]
-      if (c && near(pressDoc, c)) {
-        const anchor = corners[(i + 2) % 4]
-        if (anchor) return { kind: "scale", anchor }
-      }
-    }
-    if (near(pressDoc, this.gripDoc(box, t))) {
+    const near = (p: Point) => Math.hypot(pressDoc.x - p.x, pressDoc.y - p.y) <= r
+    if (near(this.gripDoc(box, t))) {
       return { kind: "rotate", centre: apply(t, { x: box.x + box.w / 2, y: box.y + box.h / 2 }) }
     }
+    for (let i = 0; i < HANDLES.length; i++) {
+      const h = HANDLES[i]
+      if (h && near(apply(t, h.point(box)))) return { kind: "scale", index: i }
+    }
+    const buf = invert(t, pressDoc) // inside the content box → move
+    if (buf.x >= box.x && buf.x <= box.x + box.w && buf.y >= box.y && buf.y <= box.y + box.h) {
+      return { kind: "move" }
+    }
     return null
+  }
+
+  /** The CSS cursor for a gesture under the cursor — rotation-aware for resize handles. */
+  private cursorFor(g: Gesture | null): string {
+    if (!g) return "default"
+    if (g.kind === "rotate") return "grab"
+    if (g.kind === "move") return "move"
+    const deg = (this.getLayerTransform(this.activeLayerId).rotation * 180) / Math.PI
+    return resizeCursor(g.index, deg)
+  }
+
+  /** Update the container cursor on hover — only while Move is active and not mid-drag. */
+  pointerHover(clientX: number, clientY: number) {
+    if (!this.container || this.brush.tool !== "select" || this.moveStart) return
+    const point = this.screenToDoc(clientX, clientY)
+    this.container.style.cursor = this.cursorFor(point ? this.hitTest(point) : null)
+  }
+
+  /** Set the active cursor when a drag begins (rotate uses `grabbing`). */
+  private setDragCursor(g: Gesture) {
+    if (!this.container) return
+    this.container.style.cursor = g.kind === "rotate" ? "grabbing" : this.cursorFor(g)
   }
 
   /** Redraw the selection box + handles. Shown only while Move is active over a visible layer with
@@ -890,13 +927,13 @@ export class CanvasEngine {
         listening: false,
       }),
     )
-    for (const p of corners) {
+    for (const h of HANDLES) {
+      const p = this.docToScreen(apply(t, h.point(box)))
       ov.add(
-        new Konva.Rect({
-          x: p.x - HANDLE_SIZE / 2,
-          y: p.y - HANDLE_SIZE / 2,
-          width: HANDLE_SIZE,
-          height: HANDLE_SIZE,
+        new Konva.Circle({
+          x: p.x,
+          y: p.y,
+          radius: HANDLE_SIZE / 2,
           fill: "#fff",
           stroke: SELECT_ACCENT,
           strokeWidth: 1,

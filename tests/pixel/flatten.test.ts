@@ -67,7 +67,7 @@ describe("flattenLayers (real canvas)", () => {
 
   it("composites a layer translated by its transform and clips content past the edge", () => {
     const d = flatten([layer("a")], { a: solid("#ff0000") }, "transparent", {
-      a: { x: 1, y: 0, scale: 1, rotation: 0 },
+      a: { x: 1, y: 0, scaleX: 1, scaleY: 1, rotation: 0 },
     })
     const px = (x: number, y: number) => {
       const i = (y * W + x) * 4
@@ -78,17 +78,18 @@ describe("flattenLayers (real canvas)", () => {
     expect(px(3, 0)).toEqual([255, 0, 0, 255]) // still covered; the rightmost source column clipped
   })
 
-  it("composites a layer scaled down about the origin", () => {
-    // scale 0.5 draws the 4×4 source into a 2×2 block at the top-left.
+  it("composites a layer non-uniformly scaled about the origin", () => {
+    // scaleX 0.5 draws the 4-wide source into a 2-wide block (full height) at the top-left.
     const d = flatten([layer("a")], { a: solid("#ff0000") }, "transparent", {
-      a: { x: 0, y: 0, scale: 0.5, rotation: 0 },
+      a: { x: 0, y: 0, scaleX: 0.5, scaleY: 1, rotation: 0 },
     })
     const px = (x: number, y: number) => {
       const i = (y * W + x) * 4
       return [d[i], d[i + 1], d[i + 2], d[i + 3]]
     }
-    expect(px(0, 0)).toEqual([255, 0, 0, 255]) // inside the scaled block
-    expect(px(3, 3)).toEqual([0, 0, 0, 0]) // outside it → transparent
+    expect(px(0, 0)).toEqual([255, 0, 0, 255]) // inside the narrowed block
+    expect(px(0, 3)).toEqual([255, 0, 0, 255]) // full height (scaleY 1)
+    expect(px(3, 0)).toEqual([0, 0, 0, 0]) // width clipped to 2 → transparent
   })
 
   it("paints top-of-stack (index 0) last", () => {

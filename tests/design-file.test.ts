@@ -34,8 +34,9 @@ describe("serializeDesign / parseDesign", () => {
   })
 
   it("round-trips per-layer transforms and skips identity layers", () => {
-    const t = { x: 40, y: -15, scale: 1.5, rotation: 0.3 }
-    const getTransform = (id: string) => (id === "l2" ? t : { x: 0, y: 0, scale: 1, rotation: 0 })
+    const t = { x: 40, y: -15, scaleX: 1.5, scaleY: 0.8, rotation: 0.3 }
+    const getTransform = (id: string) =>
+      id === "l2" ? t : { x: 0, y: 0, scaleX: 1, scaleY: 1, rotation: 0 }
     const json = serializeDesign(
       snapshot,
       fakePixels("data:image/png;base64,AAAA"),
@@ -68,7 +69,7 @@ describe("serializeDesign / parseDesign", () => {
       ],
     })
     expect(parseDesign(legacy).transforms).toEqual([
-      { layerId: "l1", transform: { x: 12, y: 7, scale: 1, rotation: 0 } },
+      { layerId: "l1", transform: { x: 12, y: 7, scaleX: 1, scaleY: 1, rotation: 0 } },
     ])
   })
 
