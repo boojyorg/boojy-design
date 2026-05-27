@@ -84,9 +84,10 @@ Two load-bearing rules:
   ops in undo commands (`commands.ts`), and orchestrates save/open; regions are otherwise
   presentational. The Layers panel's `LayerThumb` shows a live pixel preview: the engine fires
   `onLayerPixelsChanged` after a buffer edit, `CanvasStage` turns it into a downscaled dataURL
-  (`getLayerThumbnail`, reusing `drawImageContain`) in `thumbnailStore`, and the row reads it
-  (falling back to a type icon until a layer has pixels). Note: pixel edits otherwise *don't*
-  reach React — this signal is the one bridge, so reuse it rather than adding new ones.
+  (`getLayerThumbnail` — trims to the layer's content bounds via `thumbnail.ts`/`contentBounds`,
+  scaled to fill) in `thumbnailStore`, and the row reads it (a **blank layer shows an empty box** —
+  no thumbnail). Note: pixel edits otherwise *don't* reach React — this signal is the one bridge,
+  so reuse it rather than adding new ones.
 - **`src/lib/tools.ts`** — the tool registry. Each tool has an `mvp` flag. The lone non-MVP
   tool (Text) is shown **dimmed with a "coming in v0.5" tooltip**, and keyboard shortcuts
   (`src/hooks/useKeyboardShortcuts.ts`) act on MVP tools only. Keep the rail and the

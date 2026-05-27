@@ -62,8 +62,8 @@ match looseness), and a **Move tool** (press `V`) that repositions the active la
 shifts where the layer is *drawn* (a per-layer display offset) without moving its pixels, so
 dragging off the page edge hides the overflow but keeps it: drag back and it's intact. Move is
 translate-only; export and `.design` files honour the offset. The **Layers panel shows live
-thumbnails** — a downscaled preview of each layer's actual pixels, refreshing as you edit.
-After MVP (v0.5+): Move
+thumbnails** — each layer's content, trimmed to fill the box, refreshing as you edit (blank
+layers read empty). After MVP (v0.5+): Move
 scale/rotate transforms, Text, blend modes. The lone
 non-MVP tool (Text) appears in the rail, dimmed with a "coming in v0.5" tooltip. Sequenced,
 not piled on at once — the 8-feature MVP cap is the discipline lever.

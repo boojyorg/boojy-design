@@ -12,6 +12,7 @@ import { floodFill } from "@/editor/Canvas/engine/fill"
 import { flattenLayers } from "@/editor/Canvas/engine/flatten"
 import { moveOffset, type Offset } from "@/editor/Canvas/engine/move"
 import { drawEllipse, drawRect, normalizeRect } from "@/editor/Canvas/engine/shape"
+import { contentBounds } from "@/editor/Canvas/engine/thumbnail"
 import {
   type BrushParams,
   DOC_HEIGHT,
@@ -433,12 +434,20 @@ export class CanvasEngine {
     return this.cloneCanvas(node.canvas)
   }
 
-  /** A downscaled PNG data URL of a layer's buffer for the Layers panel preview, or null if the
-   *  layer has no node / no 2D context. Fit-centred (reuses `drawImageContain`); ignores the
-   *  layer's move-offset — the thumbnail shows buffer content, not its on-page position. */
+  /** A PNG data URL preview for the Layers panel — the layer's **content** (its non-transparent
+   *  bounding box) scaled to fill the thumbnail, aspect-preserved. Null if the layer has no node,
+   *  no 2D context, or is blank (so a blank/erased layer shows an empty box). Ignores the layer's
+   *  move-offset — the preview is about *what's* on the layer, not where it sits on the page. */
   getLayerThumbnail(layerId: string, w: number, h: number): string | null {
     const node = this.nodes.get(layerId)
     if (!node) return null
+    const bounds = contentBounds(
+      node.ctx.getImageData(0, 0, DOC_WIDTH, DOC_HEIGHT).data,
+      DOC_WIDTH,
+      DOC_HEIGHT,
+    )
+    if (!bounds) return null // blank layer → no thumbnail
+
     const thumb = document.createElement("canvas")
     thumb.width = w
     thumb.height = h
@@ -449,7 +458,22 @@ export class CanvasEngine {
       ctx = null
     }
     if (!ctx) return null
-    drawImageContain(ctx, node.canvas, DOC_WIDTH, DOC_HEIGHT, w, h)
+
+    // Fit the content box into the thumbnail (upscaling allowed, so a small mark reads large).
+    const scale = Math.min(w / bounds.w, h / bounds.h)
+    const dw = bounds.w * scale
+    const dh = bounds.h * scale
+    ctx.drawImage(
+      node.canvas,
+      bounds.x,
+      bounds.y,
+      bounds.w,
+      bounds.h,
+      (w - dw) / 2,
+      (h - dh) / 2,
+      dw,
+      dh,
+    )
     return thumb.toDataURL("image/png")
   }
 

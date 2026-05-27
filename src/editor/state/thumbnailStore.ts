@@ -13,6 +13,8 @@ interface ThumbnailState {
   cache: Map<string, string>
   /** Store/replace a layer's thumbnail. Copies the Map so subscribers re-render. */
   setThumbnail: (layerId: string, dataUrl: string) => void
+  /** Drop one layer's thumbnail (it went blank) — back to an empty box. */
+  removeThumbnail: (layerId: string) => void
   /** Drop every thumbnail (on opening a new document). */
   clearThumbnails: () => void
 }
@@ -21,5 +23,12 @@ export const useThumbnailStore = create<ThumbnailState>()((set) => ({
   cache: new Map(),
   setThumbnail: (layerId, dataUrl) =>
     set((s) => ({ cache: new Map(s.cache).set(layerId, dataUrl) })),
+  removeThumbnail: (layerId) =>
+    set((s) => {
+      if (!s.cache.has(layerId)) return s
+      const cache = new Map(s.cache)
+      cache.delete(layerId)
+      return { cache }
+    }),
   clearThumbnails: () => set({ cache: new Map() }),
 }))
