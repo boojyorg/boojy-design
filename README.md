@@ -66,7 +66,7 @@ small Zustand stores.
 ```
 
 Key paths: `src/editor/` (regions), `src/editor/Canvas/engine/` (the engine + pure math —
-`viewport.ts`, `transform.ts`, `flatten.ts`, `fill.ts`, `selection.ts`), `src/editor/state/`
+`viewport.ts`, `transform.ts`, `flatten.ts`, `fill.ts`, `selection.ts`, `stroke.ts`, `text.ts`), `src/editor/state/`
 (the stores), `src/lib/designFile.ts` (the `.design` format), `src/theme/` (Tailwind v4 tokens
 — swap `accent.design.css` to reskin for another Boojy product).
 
@@ -104,8 +104,8 @@ Full history in [CHANGELOG.md](./CHANGELOG.md).
 
 ## Project health
 
-- **Tests:** 175 across two Vitest projects — `dom` (jsdom shell/wiring, engine no-ops) and `node`
-  (real `@napi-rs/canvas` pixel tests for the engine math, incl. `selection.test.ts`).
+- **Tests:** 194 across two Vitest projects — `dom` (jsdom shell/wiring, engine no-ops) and `node`
+  (real `@napi-rs/canvas` pixel tests for the engine math, incl. `selection.test.ts`, `stroke.test.ts`, `text.test.ts`).
 - **CI:** every push/PR runs lint → test → build → build-storybook, then deploys to Cloudflare Pages
   (preview per PR, production on `main`; secret-guarded).
 - **Gates:** Biome (lint/format/import order), strict TypeScript, pre-commit (lint + typecheck) and
