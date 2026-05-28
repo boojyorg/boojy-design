@@ -1,6 +1,6 @@
 import { IDENTITY, type Transform } from "@/editor/Canvas/engine/transform"
 import type { DocumentSnapshot } from "@/editor/state/documentStore"
-import type { Layer, LayerType, VectorKind } from "@/editor/types"
+import { DEFAULT_TEXT_COLOR, type Layer, type LayerType, type VectorKind } from "@/editor/types"
 
 /**
  * The `.design` file format: a single JSON document holding the layer stack plus each
@@ -131,7 +131,7 @@ export function parseDesign(json: string): ParsedDesign {
       ? {
           textContent: l.textContent ?? "",
           fontSize: l.fontSize ?? 40,
-          textColor: l.textColor ?? "#000000",
+          textColor: l.textColor ?? DEFAULT_TEXT_COLOR,
         }
       : {}),
   }))
