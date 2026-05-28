@@ -18,7 +18,7 @@ import { NumChip } from "@/components/NumChip"
 import { PanelHead } from "@/components/PanelHead"
 import { Slider } from "@/components/ui/slider"
 import { LayerThumb } from "@/editor/LayerThumb"
-import type { Layer } from "@/editor/types"
+import { DEFAULT_TEXT_COLOR, type Layer } from "@/editor/types"
 import { cn } from "@/lib/cn"
 
 interface LayersPanelProps {
@@ -278,7 +278,7 @@ export function LayersPanel({
               <input
                 type="color"
                 aria-label="Text color"
-                value={activeLayer.textColor ?? "#000000"}
+                value={activeLayer.textColor ?? DEFAULT_TEXT_COLOR}
                 onChange={(e) => onTextColor?.(activeLayerId, e.target.value)}
                 className="h-6 w-10 cursor-pointer rounded border border-divider bg-transparent p-0"
               />

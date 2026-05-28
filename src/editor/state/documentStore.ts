@@ -1,7 +1,7 @@
 import { create } from "zustand"
 import { INITIAL_ACTIVE_LAYER_ID, INITIAL_LAYERS, INITIAL_NEXT_LAYER_NUM } from "@/editor/mock-data"
 import { newLayerId } from "@/editor/state/ids"
-import type { Layer, LayerType } from "@/editor/types"
+import { DEFAULT_TEXT_COLOR, type Layer, type LayerType } from "@/editor/types"
 
 /**
  * The document model — the layer stack and which layer is active. Graduated out
@@ -152,7 +152,7 @@ export const useDocumentStore = create<DocumentState>()((set) => ({
         opacity: 100,
         textContent: "",
         fontSize: 40,
-        textColor: "#000000",
+        textColor: DEFAULT_TEXT_COLOR,
       }
       return {
         layers: [layer, ...s.layers],

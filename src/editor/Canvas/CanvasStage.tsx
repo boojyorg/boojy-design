@@ -5,7 +5,7 @@ import { IDENTITY, type Transform } from "@/editor/Canvas/engine/transform"
 import { useThumbnailStore } from "@/editor/state/thumbnailStore"
 import { useUndoStore } from "@/editor/state/undoStore"
 import { useViewportStore } from "@/editor/state/viewportStore"
-import type { Layer, ToolId, VectorKind } from "@/editor/types"
+import { DEFAULT_TEXT_COLOR, type Layer, type ToolId, type VectorKind } from "@/editor/types"
 import { toLayerName } from "@/lib/filename"
 import { decodeImageFile } from "@/lib/loadImage"
 
@@ -675,7 +675,7 @@ export const CanvasStage = forwardRef<CanvasStageHandle, CanvasStageProps>(
             const engine = engineRef.current
             const layer = props.layers.find((l) => l.id === textEditing.layerId)
             const fontSize = layer?.fontSize ?? 40
-            const color = layer?.textColor ?? "#000000"
+            const color = layer?.textColor ?? DEFAULT_TEXT_COLOR
             const transform = engine?.getLayerTransform(textEditing.layerId)
             const screenPos =
               transform && engine ? engine.docToPagePos(transform.x, transform.y) : null
