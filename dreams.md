@@ -8,8 +8,8 @@
 
 ### Candidate work (prioritise at session start — roughly highest-leverage first)
 
-- [ ] **Split `CanvasEngine.ts` (~1400 lines).** It is both the biggest cost driver (hook re-reads the whole file every edit; 31% of usage is >150k context) **and** the merge hotspot (this session's 8-file conflict centred on it). Proposed seams, extracted as pure/ctx-taking modules behind the engine: (a) text-node logic, (b) selection/region ops, (c) transform math, (d) stroke/paint hot path. Verify pixel tests still pass per extraction.
-- [ ] **Clear the 2 standing lint warnings** — `noNonNullAssertion` at `CanvasEngine.ts:420` (`target!.canvas`) and `:803` (`target!.canvas`). Replace `target!` with a proper guard/destructure (these have ridden along as warnings since before this session).
+- [x] **Split `CanvasEngine.ts`** (was 1636 lines → ~1530). Pure/ctx-taking extractions behind the engine: `text.ts` (measure/caret/draw text), `stroke.ts` (`stampInto`/`compositeStroke` hot path), `thumbnail.ts` (`drawRasterThumbnail`/`drawTextThumbnail`), `color.ts` (`hexToRgba` moved in), plus a private `compositeToCanvas()` shared by export/sample. New pixel tests: `text.test.ts`, `stroke.test.ts`, extended `thumbnail.test.ts` + `color.test.ts`. **Stateful Konva orchestration (marquee/float, free-transform gesture, overlay/hit-test) intentionally left in the engine** — extracting it into ref-holding classes would break the pure-function pattern. 194-test suite stays green; **canvas walkthrough still required before merge** (engine no-ops under jsdom).
+- [x] **Cleared the 2 standing lint warnings** — `target!.canvas` in `beginStroke`/`endStroke` narrowed with explicit `if (!target) return` guards after the select branch. `pnpm lint` is warning-free.
 - [ ] **Bundle size** — `pnpm build` warns the main chunk is >500 KB (≈637 KB / 197 KB gzip), Konva dominates. Decide: code-split (dynamic import the engine) vs. raise `chunkSizeWarningLimit` deliberately. Don't leave it as an unexplained warning.
 - [ ] **Conventions sweep** — confirm `noUncheckedIndexedAccess` handling, `import type` usage, no inline hex (design tokens only), and that pure helpers have node/dom test coverage. Small, mechanical — good Haiku work.
 - [ ] **Merge hygiene note** — the opacity duplication conflict happened because the branch outlived a `main` advance (#24 squash-merged the same feature). Going forward: merge/rebase `main` into long branches frequently, and squash-merge promptly so the same work doesn't land twice.
@@ -64,6 +64,129 @@
 - [ ] **UI Bug:** Add manual observations from `pnpm dev` walkthroughs here.
 
 ### 🚨 Automated Engine Incident Logs (Script Prepended)
+- [ ] **Fix TypeScript Typecheck Failure in `/Users/tyrbujac/Documents/Projects/boojy/boojy-design/tests/pixel/thumbnail.test.ts`**
+  ```text
+  
+> boojy-design@0.4.0 typecheck /Users/tyrbujac/Documents/Projects/boojy/boojy-design
+> tsc -b --noEmit
+
+tests/pixel/thumbnail.test.ts(1,1): error TS6133: 'createCanvas' is declared but its value is never read.
+tests/pixel/thumbnail.test.ts(5,3): error TS6133: 'drawRasterThumbnail' is declared but its value is never read.
+tests/pixel/thumbnail.test.ts(6,3): error TS6133: 'drawTextThumbnail' is declared but its value is never read.
+ ELIFECYCLE  Command failed with exit code 2.
+  ```
+- [ ] **Fix TypeScript Typecheck Failure in `/Users/tyrbujac/Documents/Projects/boojy/boojy-design/src/editor/Canvas/engine/CanvasEngine.ts`**
+  ```text
+  
+> boojy-design@0.4.0 typecheck /Users/tyrbujac/Documents/Projects/boojy/boojy-design
+> tsc -b --noEmit
+
+src/editor/Canvas/engine/CanvasEngine.ts(953,7): error TS2304: Cannot find name 'drawTextThumbnail'.
+src/editor/Canvas/engine/CanvasEngine.ts(968,5): error TS2304: Cannot find name 'drawRasterThumbnail'.
+ ELIFECYCLE  Command failed with exit code 2.
+  ```
+- [ ] **Fix TypeScript Typecheck Failure in `/Users/tyrbujac/Documents/Projects/boojy/boojy-design/src/editor/Canvas/engine/CanvasEngine.ts`**
+  ```text
+  
+> boojy-design@0.4.0 typecheck /Users/tyrbujac/Documents/Projects/boojy/boojy-design
+> tsc -b --noEmit
+
+src/editor/Canvas/engine/CanvasEngine.ts(1150,11): error TS6133: 'makeCanvas' is declared but its value is never read.
+ ELIFECYCLE  Command failed with exit code 2.
+  ```
+- [ ] **Fix TypeScript Typecheck Failure in `/Users/tyrbujac/Documents/Projects/boojy/boojy-design/tests/pixel/color.test.ts`**
+  ```text
+  
+> boojy-design@0.4.0 typecheck /Users/tyrbujac/Documents/Projects/boojy/boojy-design
+> tsc -b --noEmit
+
+tests/pixel/color.test.ts(3,10): error TS6133: 'hexToRgba' is declared but its value is never read.
+ ELIFECYCLE  Command failed with exit code 2.
+  ```
+- [ ] **Fix TypeScript Typecheck Failure in `/Users/tyrbujac/Documents/Projects/boojy/boojy-design/src/editor/Canvas/engine/CanvasEngine.ts`**
+  ```text
+  
+> boojy-design@0.4.0 typecheck /Users/tyrbujac/Documents/Projects/boojy/boojy-design
+> tsc -b --noEmit
+
+src/editor/Canvas/engine/CanvasEngine.ts(1192,5): error TS2304: Cannot find name 'stampInto'.
+src/editor/Canvas/engine/CanvasEngine.ts(1200,5): error TS2304: Cannot find name 'compositeStroke'.
+ ELIFECYCLE  Command failed with exit code 2.
+  ```
+- [ ] **Fix TypeScript Typecheck Failure in `/Users/tyrbujac/Documents/Projects/boojy/boojy-design/src/editor/Canvas/engine/CanvasEngine.ts`**
+  ```text
+  
+> boojy-design@0.4.0 typecheck /Users/tyrbujac/Documents/Projects/boojy/boojy-design
+> tsc -b --noEmit
+
+src/editor/Canvas/engine/CanvasEngine.ts(3,3): error TS6133: 'compositeOp' is declared but its value is never read.
+src/editor/Canvas/engine/CanvasEngine.ts(4,3): error TS6133: 'hardnessStops' is declared but its value is never read.
+src/editor/Canvas/engine/CanvasEngine.ts(8,3): error TS6133: 'strokeAlpha' is declared but its value is never read.
+src/editor/Canvas/engine/CanvasEngine.ts(1199,5): error TS2304: Cannot find name 'stampInto'.
+  ```
+- [ ] **Fix TypeScript Typecheck Failure in `/Users/tyrbujac/Documents/Projects/boojy/boojy-design/src/editor/Canvas/engine/CanvasEngine.ts`**
+  ```text
+  
+> boojy-design@0.4.0 typecheck /Users/tyrbujac/Documents/Projects/boojy/boojy-design
+> tsc -b --noEmit
+
+src/editor/Canvas/engine/CanvasEngine.ts(3,3): error TS6133: 'compositeOp' is declared but its value is never read.
+src/editor/Canvas/engine/CanvasEngine.ts(4,3): error TS6133: 'hardnessStops' is declared but its value is never read.
+src/editor/Canvas/engine/CanvasEngine.ts(8,3): error TS6133: 'strokeAlpha' is declared but its value is never read.
+src/editor/Canvas/engine/CanvasEngine.ts(1199,5): error TS2304: Cannot find name 'stampInto'.
+  ```
+- [ ] **Fix TypeScript Typecheck Failure in `/Users/tyrbujac/Documents/Projects/boojy/boojy-design/src/editor/Canvas/engine/CanvasEngine.ts`**
+  ```text
+  
+> boojy-design@0.4.0 typecheck /Users/tyrbujac/Documents/Projects/boojy/boojy-design
+> tsc -b --noEmit
+
+src/editor/Canvas/engine/CanvasEngine.ts(922,22): error TS2339: Property 'scratchCtx' does not exist on type 'CanvasEngine'.
+src/editor/Canvas/engine/CanvasEngine.ts(947,30): error TS2339: Property 'scratchCtx' does not exist on type 'CanvasEngine'.
+src/editor/Canvas/engine/CanvasEngine.ts(1325,39): error TS2339: Property 'scratchCtx' does not exist on type 'CanvasEngine'.
+ ELIFECYCLE  Command failed with exit code 2.
+  ```
+- [ ] **Fix TypeScript Typecheck Failure in `/Users/tyrbujac/Documents/Projects/boojy/boojy-design/src/editor/Canvas/engine/CanvasEngine.ts`**
+  ```text
+  
+> boojy-design@0.4.0 typecheck /Users/tyrbujac/Documents/Projects/boojy/boojy-design
+> tsc -b --noEmit
+
+src/editor/Canvas/engine/CanvasEngine.ts(922,22): error TS2339: Property 'scratchCtx' does not exist on type 'CanvasEngine'.
+src/editor/Canvas/engine/CanvasEngine.ts(947,30): error TS2339: Property 'scratchCtx' does not exist on type 'CanvasEngine'.
+ ELIFECYCLE  Command failed with exit code 2.
+  ```
+- [ ] **Fix TypeScript Typecheck Failure in `/Users/tyrbujac/Documents/Projects/boojy/boojy-design/src/editor/Canvas/engine/CanvasEngine.ts`**
+  ```text
+  
+> boojy-design@0.4.0 typecheck /Users/tyrbujac/Documents/Projects/boojy/boojy-design
+> tsc -b --noEmit
+
+src/editor/Canvas/engine/CanvasEngine.ts(16,24): error TS6133: 'drawText' is declared but its value is never read.
+src/editor/Canvas/engine/CanvasEngine.ts(922,22): error TS2339: Property 'scratchCtx' does not exist on type 'CanvasEngine'.
+src/editor/Canvas/engine/CanvasEngine.ts(947,30): error TS2339: Property 'scratchCtx' does not exist on type 'CanvasEngine'.
+ ELIFECYCLE  Command failed with exit code 2.
+  ```
+- [ ] **Fix TypeScript Typecheck Failure in `/Users/tyrbujac/Documents/Projects/boojy/boojy-design/src/editor/Canvas/engine/CanvasEngine.ts`**
+  ```text
+  
+> boojy-design@0.4.0 typecheck /Users/tyrbujac/Documents/Projects/boojy/boojy-design
+> tsc -b --noEmit
+
+src/editor/Canvas/engine/CanvasEngine.ts(16,10): error TS6133: 'caretIndexAt' is declared but its value is never read.
+src/editor/Canvas/engine/CanvasEngine.ts(16,24): error TS6133: 'drawText' is declared but its value is never read.
+src/editor/Canvas/engine/CanvasEngine.ts(922,22): error TS2339: Property 'scratchCtx' does not exist on type 'CanvasEngine'.
+ ELIFECYCLE  Command failed with exit code 2.
+  ```
+- [ ] **Fix TypeScript Typecheck Failure in `/Users/tyrbujac/Documents/Projects/boojy/boojy-design/src/editor/Canvas/engine/CanvasEngine.ts`**
+  ```text
+  
+> boojy-design@0.4.0 typecheck /Users/tyrbujac/Documents/Projects/boojy/boojy-design
+> tsc -b --noEmit
+
+src/editor/Canvas/engine/CanvasEngine.ts(16,1): error TS6192: All imports in import declaration are unused.
+ ELIFECYCLE  Command failed with exit code 2.
+  ```
 
 _None open. (Cleared 2026-05-28 — all prior `0.3.0` typecheck entries were intermediate dev errors, resolved on the merged v0.4.0 branch; `pnpm typecheck` green.)_
 

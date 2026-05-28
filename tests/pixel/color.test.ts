@@ -1,6 +1,6 @@
 import { type Canvas, createCanvas } from "@napi-rs/canvas"
 import { describe, expect, it } from "vitest"
-import { rgbaToHex } from "@/editor/Canvas/engine/color"
+import { hexToRgba, rgbaToHex } from "@/editor/Canvas/engine/color"
 import { flattenLayers } from "@/editor/Canvas/engine/flatten"
 import type { Layer } from "@/editor/types"
 
@@ -13,6 +13,16 @@ describe("rgbaToHex", () => {
 
   it("zero-pads single-digit channels", () => {
     expect(rgbaToHex(1, 2, 3)).toBe("#010203")
+  })
+})
+
+describe("hexToRgba", () => {
+  it("expands #RRGGBB to an rgba() string at the given alpha", () => {
+    expect(hexToRgba("#E89940", 0.5)).toBe("rgba(232, 153, 64, 0.5)")
+  })
+
+  it("expands shorthand #RGB", () => {
+    expect(hexToRgba("#fff", 1)).toBe("rgba(255, 255, 255, 1)")
   })
 })
 

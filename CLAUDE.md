@@ -87,12 +87,12 @@ Konva is the chosen engine — the brush hot path clears 60fps at 2K/50 layers o
 
 ### Next up — Repo structure & quality pass (not a feature; plan before starting)
 
-Post-MVP housekeeping to lower per-edit cost and merge pain before more features land. Do it in small, single-concern PRs, plan-mode first, keeping the `CanvasStage` → engine seam intact. Full checklist in `dreams.md` §1. Headline items:
+Post-MVP housekeeping to lower per-edit cost and merge pain before more features land. Do it in small, single-concern PRs, plan-mode first, keeping the `CanvasStage` → engine seam intact. Full checklist in `dreams.md` §1. Status:
 
-* **Split `CanvasEngine.ts` (~1400 lines)** along seams (text-node / selection-region / transform math / stroke hot path) as pure/ctx-taking modules — it's the top cost driver and the merge hotspot.
-* **Clear the 2 standing `noNonNullAssertion` lint warnings** in `CanvasEngine.ts` (lines ~420, ~803).
-* **Resolve the >500 KB bundle warning** — code-split the engine or raise the limit deliberately.
-* **Conventions sweep** — indexed-access safety, `import type`, no inline hex, helper test coverage.
+* **Engine split — pure extractions done.** `CanvasEngine.ts` is now ~1530 lines (was 1636). Pure/ctx-taking logic lives in helper modules the engine delegates to: `text.ts` (measure/caret/draw), `stroke.ts` (`stampInto`/`compositeStroke` hot path), `thumbnail.ts` (`drawRasterThumbnail`/`drawTextThumbnail`), plus a shared `compositeToCanvas()` for export/sample. The stateful Konva orchestration (marquee/float, free-transform gesture, overlay/hit-test) intentionally stays in the engine.
+* **Lint warnings — cleared.** The 2 `noNonNullAssertion` `target!` sites in `beginStroke`/`endStroke` are now narrowed with explicit guards; `pnpm lint` is warning-free.
+* **Resolve the >500 KB bundle warning** — code-split the engine or raise the limit deliberately. *(pending)*
+* **Conventions sweep** — indexed-access safety, `import type`, no inline hex, helper test coverage. *(pending)*
 
 ### Post-MVP features (deferred — don't start without a new milestone plan)
 

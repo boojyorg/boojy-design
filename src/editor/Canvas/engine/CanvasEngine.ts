@@ -1,19 +1,19 @@
 import Konva from "konva"
-import {
-  compositeOp,
-  hardnessStops,
-  interpolateStamps,
-  snapTo45,
-  stampSpacing,
-  strokeAlpha,
-} from "@/editor/Canvas/engine/brush"
+import { interpolateStamps, snapTo45, stampSpacing } from "@/editor/Canvas/engine/brush"
 import { hexToRgb, rgbaToHex } from "@/editor/Canvas/engine/color"
 import { drawImageContain } from "@/editor/Canvas/engine/draw"
 import { floodFill } from "@/editor/Canvas/engine/fill"
 import { flattenLayers } from "@/editor/Canvas/engine/flatten"
 import { clearRegion, copyRegion, flipRegion } from "@/editor/Canvas/engine/selection"
 import { drawEllipse, drawRect, normalizeRect } from "@/editor/Canvas/engine/shape"
-import { type Bounds, contentBounds } from "@/editor/Canvas/engine/thumbnail"
+import { compositeStroke, stampInto } from "@/editor/Canvas/engine/stroke"
+import { caretIndexAt, drawText, textContentBox } from "@/editor/Canvas/engine/text"
+import {
+  type Bounds,
+  contentBounds,
+  drawRasterThumbnail,
+  drawTextThumbnail,
+} from "@/editor/Canvas/engine/thumbnail"
 import {
   apply,
   type Box,
@@ -413,11 +413,15 @@ export class CanvasEngine {
       return
     }
 
+    // Paint tools reach here only with a visible raster node (the `else` guard above) — narrow
+    // `target` from `RasterNode | undefined` to non-null so the buffer ops below are safe.
+    if (!target) return
+
     // Paint tools work in buffer-local space (the inverse of the layer's transform), so a stroke
     // lands under the cursor on a moved/scaled/rotated layer without changing the rest of the path.
     const local = invert(this.getLayerTransform(this.activeLayerId), point)
     this.snapshotCtx.clearRect(0, 0, DOC_WIDTH, DOC_HEIGHT)
-    this.snapshotCtx.drawImage(target!.canvas, 0, 0)
+    this.snapshotCtx.drawImage(target.canvas, 0, 0)
     this.strokeCtx.clearRect(0, 0, DOC_WIDTH, DOC_HEIGHT)
     this.carryOver = 0
     this.lastPoint = local
@@ -781,6 +785,10 @@ export class CanvasEngine {
       return
     }
 
+    // Paint path: the top guard only lets a non-select tool through with a non-null target —
+    // narrow it so the snapshot/commit below don't need a non-null assertion.
+    if (!target) return
+
     this.render() // bake the final state into the layer buffer
 
     // A shape click with no drag (zero width/height) paints nothing — skip the commit
@@ -800,7 +808,7 @@ export class CanvasEngine {
       this.onStrokeCommitted?.({
         layerId: this.strokeLayerId,
         before: this.cloneCanvas(this.snapshotCanvas),
-        after: this.cloneCanvas(target!.canvas),
+        after: this.cloneCanvas(target.canvas),
       })
       this.notifyPixels(this.strokeLayerId)
     }
@@ -918,6 +926,7 @@ export class CanvasEngine {
   hitTestTextLayer(clientX: number, clientY: number): string | null {
     const point = this.screenToDoc(clientX, clientY)
     if (!point) return null
+    const ctx = this.scratchCtx()
     for (const layer of this.layers) {
       if (!layer.visible) continue
       const tn = this.textNodes.get(layer.id)
@@ -925,18 +934,8 @@ export class CanvasEngine {
       const text = tn.text.text()
       if (!text) continue
       const local = invert(this.getLayerTransform(layer.id), point)
-      const fontSize = tn.text.fontSize()
-      let w = fontSize * text.length * 0.6
-      try {
-        const tmp = document.createElement("canvas").getContext("2d")
-        if (tmp) {
-          tmp.font = `${fontSize}px sans-serif`
-          w = tmp.measureText(text).width
-        }
-      } catch {
-        /* ignore */
-      }
-      if (local.x >= 0 && local.x <= w && local.y >= 0 && local.y <= fontSize * 1.3) return layer.id
+      const box = textContentBox(ctx, text, tn.text.fontSize())
+      if (local.x >= 0 && local.x <= box.w && local.y >= 0 && local.y <= box.h) return layer.id
     }
     return null
   }
@@ -952,21 +951,7 @@ export class CanvasEngine {
     // localX: distance from the text origin in doc space (single-line, no rotation for now).
     const docPt = this.screenToDoc(clientX, 0)
     const localX = docPt ? docPt.x - t.x : 0
-    const fontSize = tn.text.fontSize()
-    try {
-      const tmp = document.createElement("canvas").getContext("2d")
-      if (!tmp) return 0
-      tmp.font = `${fontSize}px sans-serif`
-      let prev = 0
-      for (let i = 1; i <= text.length; i++) {
-        const w = tmp.measureText(text.slice(0, i)).width
-        if (localX < (prev + w) / 2) return i - 1
-        prev = w
-      }
-      return text.length
-    } catch {
-      return 0
-    }
+    return caretIndexAt(this.scratchCtx(), text, tn.text.fontSize(), localX)
   }
 
   /** A PNG data URL preview for the Layers panel. For text layers renders the text string; for
@@ -976,22 +961,10 @@ export class CanvasEngine {
     if (tn) {
       const text = tn.text.text()
       if (!text) return null
-      const thumb = document.createElement("canvas")
-      thumb.width = w
-      thumb.height = h
-      let ctx: CanvasRenderingContext2D | null = null
-      try {
-        ctx = thumb.getContext("2d")
-      } catch {
-        ctx = null
-      }
-      if (!ctx) return null
-      const fs = Math.min(tn.text.fontSize(), Math.round(h * 0.65))
-      ctx.font = `${fs}px sans-serif`
-      ctx.fillStyle = tn.text.fill() as string
-      ctx.textBaseline = "middle"
-      ctx.fillText(text.slice(0, 14), 4, h / 2)
-      return thumb.toDataURL("image/png")
+      const thumb = this.makeCanvas(w, h)
+      if (!thumb) return null
+      drawTextThumbnail(thumb.ctx, text, tn.text.fontSize(), tn.text.fill() as string, h)
+      return thumb.canvas.toDataURL("image/png")
     }
 
     const node = this.nodes.get(layerId)
@@ -1003,33 +976,10 @@ export class CanvasEngine {
     )
     if (!bounds) return null // blank layer → no thumbnail
 
-    const thumb = document.createElement("canvas")
-    thumb.width = w
-    thumb.height = h
-    let ctx: CanvasRenderingContext2D | null = null
-    try {
-      ctx = thumb.getContext("2d")
-    } catch {
-      ctx = null
-    }
-    if (!ctx) return null
-
-    // Fit the content box into the thumbnail (upscaling allowed, so a small mark reads large).
-    const scale = Math.min(w / bounds.w, h / bounds.h)
-    const dw = bounds.w * scale
-    const dh = bounds.h * scale
-    ctx.drawImage(
-      node.canvas,
-      bounds.x,
-      bounds.y,
-      bounds.w,
-      bounds.h,
-      (w - dw) / 2,
-      (h - dh) / 2,
-      dw,
-      dh,
-    )
-    return thumb.toDataURL("image/png")
+    const thumb = this.makeCanvas(w, h)
+    if (!thumb) return null
+    drawRasterThumbnail(thumb.ctx, node.canvas, bounds, w, h)
+    return thumb.canvas.toDataURL("image/png")
   }
 
   /**
@@ -1039,32 +989,9 @@ export class CanvasEngine {
    * stack order. `background: "white"` fills the page first; "transparent" leaves alpha.
    */
   exportPNG(opts?: { background?: "white" | "transparent" }) {
-    const background = opts?.background ?? "white"
-    const out = document.createElement("canvas")
-    out.width = DOC_WIDTH
-    out.height = DOC_HEIGHT
-    let ctx: CanvasRenderingContext2D | null = null
-    try {
-      ctx = out.getContext("2d")
-    } catch {
-      ctx = null
-    }
-    if (!ctx) return
-
-    flattenLayers(
-      ctx,
-      this.layers,
-      (id) => this.nodes.get(id)?.canvas ?? this.renderTextToCanvas(id) ?? undefined,
-      {
-        background,
-        backgroundColor: PAGE_BACKGROUND,
-        width: DOC_WIDTH,
-        height: DOC_HEIGHT,
-      },
-      (id) => this.getLayerTransform(id),
-    )
-
-    out.toBlob((blob) => {
+    const composite = this.compositeToCanvas(opts?.background ?? "white")
+    if (!composite) return
+    composite.canvas.toBlob((blob) => {
       if (blob) downloadBlob(blob, toExportFilename("Untitled"))
     }, "image/png")
   }
@@ -1079,32 +1006,28 @@ export class CanvasEngine {
     const y = Math.floor(point.y)
     if (x < 0 || y < 0 || x >= DOC_WIDTH || y >= DOC_HEIGHT) return null
 
-    const out = document.createElement("canvas")
-    out.width = DOC_WIDTH
-    out.height = DOC_HEIGHT
-    let ctx: CanvasRenderingContext2D | null = null
-    try {
-      ctx = out.getContext("2d")
-    } catch {
-      ctx = null
-    }
-    if (!ctx) return null
+    const composite = this.compositeToCanvas("white")
+    if (!composite) return null
+    const d = composite.ctx.getImageData(x, y, 1, 1).data
+    return rgbaToHex(d[0] ?? 0, d[1] ?? 0, d[2] ?? 0)
+  }
 
+  /** Flatten the whole layer stack onto a fresh DOC-sized canvas (white or transparent page).
+   *  Shared by exportPNG (→ PNG blob) and sampleColorAt (→ pixel read); identical to the export
+   *  composite so "what you click is what you get". Null under jsdom (no canvas backend). */
+  private compositeToCanvas(
+    background: "white" | "transparent",
+  ): { canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D } | null {
+    const out = this.makeCanvas(DOC_WIDTH, DOC_HEIGHT)
+    if (!out) return null
     flattenLayers(
-      ctx,
+      out.ctx,
       this.layers,
       (id) => this.nodes.get(id)?.canvas ?? this.renderTextToCanvas(id) ?? undefined,
-      {
-        background: "white",
-        backgroundColor: PAGE_BACKGROUND,
-        width: DOC_WIDTH,
-        height: DOC_HEIGHT,
-      },
+      { background, backgroundColor: PAGE_BACKGROUND, width: DOC_WIDTH, height: DOC_HEIGHT },
       (id) => this.getLayerTransform(id),
     )
-
-    const d = ctx.getImageData(x, y, 1, 1).data
-    return rgbaToHex(d[0] ?? 0, d[1] ?? 0, d[2] ?? 0)
+    return out
   }
 
   /** Flood-fill the active layer from a screen point with the foreground colour. Contiguous,
@@ -1165,6 +1088,32 @@ export class CanvasEngine {
     this.layer?.batchDraw()
   }
 
+  /** A throwaway 2D context for text measuring. Null under jsdom (no canvas backend). */
+  private scratchCtx(): CanvasRenderingContext2D | null {
+    try {
+      return document.createElement("canvas").getContext("2d")
+    } catch {
+      return null
+    }
+  }
+
+  /** A fresh w×h canvas + its 2D context, or null under jsdom (no canvas backend). */
+  private makeCanvas(
+    w: number,
+    h: number,
+  ): { canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D } | null {
+    const canvas = document.createElement("canvas")
+    canvas.width = w
+    canvas.height = h
+    let ctx: CanvasRenderingContext2D | null = null
+    try {
+      ctx = canvas.getContext("2d")
+    } catch {
+      ctx = null
+    }
+    return ctx ? { canvas, ctx } : null
+  }
+
   /** Copy a document-space canvas into a fresh one (for history snapshots). */
   private cloneCanvas(source: HTMLCanvasElement): HTMLCanvasElement {
     const copy = document.createElement("canvas")
@@ -1208,17 +1157,8 @@ export class CanvasEngine {
 
   /** Paint one stamp into the stroke buffer at full alpha (centre→edge gradient). */
   private stampAt(point: Point) {
-    const ctx = this.strokeCtx
-    if (!ctx) return
-    const radius = Math.max(0.5, this.brush.size / 2)
-    const grad = ctx.createRadialGradient(point.x, point.y, 0, point.x, point.y, radius)
-    for (const stop of hardnessStops(this.brush.hardness)) {
-      grad.addColorStop(stop.offset, hexToRgba(this.brush.color, stop.alpha))
-    }
-    ctx.fillStyle = grad
-    ctx.beginPath()
-    ctx.arc(point.x, point.y, radius, 0, Math.PI * 2)
-    ctx.fill()
+    if (!this.strokeCtx) return
+    stampInto(this.strokeCtx, point, this.brush)
   }
 
   /** Redraw the target buffer = snapshot + (stroke composited once at stroke opacity). */
@@ -1226,19 +1166,7 @@ export class CanvasEngine {
     const target = this.target
     if (!target || !this.snapshotCanvas || !this.strokeCanvas) return
     const tool = this.brush.tool === "eraser" ? "eraser" : "brush"
-    const ctx = target.ctx
-
-    ctx.clearRect(0, 0, DOC_WIDTH, DOC_HEIGHT)
-    ctx.globalAlpha = 1
-    ctx.globalCompositeOperation = "source-over"
-    ctx.drawImage(this.snapshotCanvas, 0, 0)
-
-    ctx.globalAlpha = strokeAlpha(this.brush.opacity)
-    ctx.globalCompositeOperation = compositeOp(tool)
-    ctx.drawImage(this.strokeCanvas, 0, 0)
-
-    ctx.globalAlpha = 1
-    ctx.globalCompositeOperation = "source-over"
+    compositeStroke(target.ctx, this.snapshotCanvas, this.strokeCanvas, this.brush.opacity, tool)
     this.layer?.batchDraw()
   }
 
@@ -1307,10 +1235,7 @@ export class CanvasEngine {
       ctx = null
     }
     if (!ctx) return null
-    ctx.font = `${tn.text.fontSize()}px sans-serif`
-    ctx.fillStyle = tn.text.fill() as string
-    ctx.textBaseline = "top"
-    ctx.fillText(text, 0, 0)
+    drawText(ctx, text, tn.text.fontSize(), tn.text.fill() as string)
     return canvas
   }
 
@@ -1347,18 +1272,7 @@ export class CanvasEngine {
         this.contentBoxCache = { layerId: id, box: null }
         return null
       }
-      const fontSize = tn.text.fontSize()
-      let textWidth = fontSize * text.length * 0.6
-      try {
-        const tmp = document.createElement("canvas").getContext("2d")
-        if (tmp) {
-          tmp.font = `${fontSize}px sans-serif`
-          textWidth = tmp.measureText(text).width
-        }
-      } catch {
-        /* ignore */
-      }
-      const box: Bounds = { x: 0, y: 0, w: textWidth, h: fontSize * 1.3 }
+      const box = textContentBox(this.scratchCtx(), text, tn.text.fontSize())
       this.contentBoxCache = { layerId: id, box }
       return box
     }
@@ -1622,14 +1536,4 @@ export class CanvasEngine {
       this.marqueeAnimFrame = null
     }
   }
-}
-
-/** Expand a `#rrggbb` (or `#rgb`) hex to an `rgba()` string at the given alpha. */
-function hexToRgba(hex: string, alpha: number): string {
-  const h = hex.replace("#", "")
-  const full = h.length === 3 ? `${h[0]}${h[0]}${h[1]}${h[1]}${h[2]}${h[2]}` : h
-  const r = Number.parseInt(full.slice(0, 2), 16)
-  const g = Number.parseInt(full.slice(2, 4), 16)
-  const b = Number.parseInt(full.slice(4, 6), 16)
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`
 }

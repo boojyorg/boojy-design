@@ -14,3 +14,9 @@ export function hexToRgb(hex: string): { r: number; g: number; b: number } {
     b: Number.parseInt(full.slice(4, 6), 16) || 0,
   }
 }
+
+/** Expand a `#RGB` or `#RRGGBB` hex to an `rgba()` string at the given alpha (for gradient stops). */
+export function hexToRgba(hex: string, alpha: number): string {
+  const { r, g, b } = hexToRgb(hex)
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`
+}
