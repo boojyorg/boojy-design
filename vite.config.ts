@@ -21,6 +21,19 @@ export default defineConfig({
       "@": fileURLToPath(new URL("./src", import.meta.url)),
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        // Split Konva (the bulk of the bundle) into its own vendor chunk. The app *is* the editor
+        // — there are no routes to lazily defer behind, so Konva loads on first paint regardless;
+        // isolating it just silences the >500 KB warning honestly and lets the browser cache it
+        // across deploys (app code churns far more often than the engine dependency).
+        manualChunks(id) {
+          if (id.includes("node_modules/konva")) return "konva"
+        },
+      },
+    },
+  },
   test: {
     // Coverage is configured once at the root and spans both projects below.
     coverage: {

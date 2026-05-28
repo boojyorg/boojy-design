@@ -91,7 +91,7 @@ Post-MVP housekeeping to lower per-edit cost and merge pain before more features
 
 * **Engine split — pure extractions done.** `CanvasEngine.ts` is now ~1530 lines (was 1636). Pure/ctx-taking logic lives in helper modules the engine delegates to: `text.ts` (measure/caret/draw), `stroke.ts` (`stampInto`/`compositeStroke` hot path), `thumbnail.ts` (`drawRasterThumbnail`/`drawTextThumbnail`), plus a shared `compositeToCanvas()` for export/sample. The stateful Konva orchestration (marquee/float, free-transform gesture, overlay/hit-test) intentionally stays in the engine.
 * **Lint warnings — cleared.** The 2 `noNonNullAssertion` `target!` sites in `beginStroke`/`endStroke` are now narrowed with explicit guards; `pnpm lint` is warning-free.
-* **Resolve the >500 KB bundle warning** — code-split the engine or raise the limit deliberately. *(pending)*
+* **Bundle warning — resolved.** `vite.config.ts` splits Konva into its own vendor chunk via `manualChunks` (Konva ≈181 KB, app ≈454 KB — both under the 500 KB limit, so the warning is gone). The app *is* the editor (no routes to lazily defer behind), so this is for honest caching, not deferred load.
 * **Conventions sweep** — indexed-access safety, `import type`, no inline hex, helper test coverage. *(pending)*
 
 ### Post-MVP features (deferred — don't start without a new milestone plan)
