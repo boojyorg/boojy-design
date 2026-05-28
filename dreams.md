@@ -2,7 +2,7 @@
 
 ## 1. 🎯 Active Engineering Target
 
-- [ ] **Current Focus:** Marquee flip H/V + drag-to-float (`feat/flip-in-place-drag-mirror`)
+- [x] **Shipped v0.2.1:** Marquee flip H/V + drag-to-float (`feat/flip-in-place-drag-mirror`) — merged + tagged
 
 ### Implementation checklist
 

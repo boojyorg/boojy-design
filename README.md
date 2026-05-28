@@ -1,12 +1,12 @@
 # Boojy Design — web image editor
 
 [![CI](https://github.com/tyrbujac/boojy-design/actions/workflows/ci.yml/badge.svg)](https://github.com/tyrbujac/boojy-design/actions/workflows/ci.yml)
-[![version](https://img.shields.io/badge/version-0.2.0-E89940)](./CHANGELOG.md)
+[![version](https://img.shields.io/badge/version-0.2.1-E89940)](./CHANGELOG.md)
 
 A web image editor built on the **V1 "Classic"** layout: top bar, left tool rail, canvas, and a
 collapsible right sidebar.
 
-> **Status: active side-project (v0.2.0).** The UI shell is live and the design direction is
+> **Status: active side-project (v0.2.1).** The UI shell is live and the design direction is
 > confirmed. The Konva canvas engine has landed and the MVP paint loop works — paint, shapes, fill,
 > layers, transform, selection, undo/redo, import/export, and `.design` save/open — all behind a
 > clean seam (`CanvasStage` → `Canvas/engine/`).

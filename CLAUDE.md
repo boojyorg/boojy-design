@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is (read first)
 
-Boojy Design is a web image editor built on the V1 "Classic" shell (top bar, left tool rail, canvas, right sidebar). The shell shipped and is confirmed; the Konva canvas engine has landed and the full MVP feature set is live. The app is tagged **v0.2.0** — see `CHANGELOG.md`.
+Boojy Design is a web image editor built on the V1 "Classic" shell (top bar, left tool rail, canvas, right sidebar). The shell shipped and is confirmed; the Konva canvas engine has landed and the full MVP feature set is live. The app is tagged **v0.2.1** — see `CHANGELOG.md`.
 
 Two things that still shape any change:
 
