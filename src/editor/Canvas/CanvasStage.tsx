@@ -36,6 +36,8 @@ interface CanvasStageProps {
   onRequestImageLayer: (name: string) => void
   /** Eyedropper picked a colour (visible composite under the cursor). */
   onSampleColor: (hex: string) => void
+  /** Move tool clicked a different layer — select it in the document store. */
+  onSelectLayer: (id: string) => void
 }
 
 /** The narrow imperative surface the engine exposes across the seam. */
@@ -54,6 +56,14 @@ export interface CanvasStageHandle {
   clearTransforms: () => void
   /** Flip the active layer horizontally or vertically (undoable). */
   flipActiveLayer: (axis: "h" | "v") => void
+  /** Copy the selected region of the active layer into the internal clipboard. Returns true if there was a selection. */
+  copySelection: () => boolean
+  /** Cut the selected region (copy + delete). No-op without a selection. */
+  cutSelection: () => void
+  /** Delete the selected region from the active layer (undoable). No-op without a selection. */
+  deleteSelection: () => void
+  /** The internal clipboard canvas (full doc-space), or null if nothing has been copied. */
+  getClipboard: () => HTMLCanvasElement | null
 }
 
 export const CanvasStage = forwardRef<CanvasStageHandle, CanvasStageProps>(
@@ -113,6 +123,10 @@ export const CanvasStage = forwardRef<CanvasStageHandle, CanvasStageProps>(
           engineRef.current?.setLayerTransform(layerId, transform),
         clearTransforms: () => engineRef.current?.clearTransforms(),
         flipActiveLayer: (axis) => engineRef.current?.flipActiveLayer(axis),
+        copySelection: () => engineRef.current?.copySelection() ?? false,
+        cutSelection: () => engineRef.current?.cutSelection(),
+        deleteSelection: () => engineRef.current?.deleteSelection(),
+        getClipboard: () => engineRef.current?.getClipboard() ?? null,
       }),
       [importImage],
     )
@@ -163,7 +177,10 @@ export const CanvasStage = forwardRef<CanvasStageHandle, CanvasStageProps>(
         if (url) setThumbnail(layerId, url)
         else removeThumbnail(layerId)
       })
-    }, [record, setThumbnail, removeThumbnail])
+      engineRef.current?.setOnLayerAutoSelected((layerId) => {
+        props.onSelectLayer(layerId)
+      })
+    }, [record, setThumbnail, removeThumbnail, props.onSelectLayer])
 
     useEffect(() => {
       engineRef.current?.setBrush({
@@ -270,6 +287,16 @@ export const CanvasStage = forwardRef<CanvasStageHandle, CanvasStageProps>(
       }
     }, [])
 
+    // Marquee tool: Escape clears the active selection.
+    useEffect(() => {
+      if (props.tool !== "marquee") return
+      const onKey = (e: KeyboardEvent) => {
+        if (e.key === "Escape") engineRef.current?.clearSelection()
+      }
+      window.addEventListener("keydown", onKey)
+      return () => window.removeEventListener("keydown", onKey)
+    }, [props.tool])
+
     // Move tool: arrow keys nudge the active layer (1px; 10px with Shift), each press a
     // single undoable step. Only attached while Move is active, so other tools' arrow
     // behaviour is untouched; ignored while typing so the layer-rename field keeps caret keys.
@@ -305,7 +332,11 @@ export const CanvasStage = forwardRef<CanvasStageHandle, CanvasStageProps>(
     }, [props.tool])
 
     const isPaintTool = props.tool === "brush" || props.tool === "eraser" || props.tool === "shape"
-    const showCrosshair = isPaintTool || props.tool === "eyedropper" || props.tool === "fill"
+    const showCrosshair =
+      isPaintTool ||
+      props.tool === "eyedropper" ||
+      props.tool === "fill" ||
+      props.tool === "marquee"
     // Pan mode (Space held or Hand tool) wins over every tool cursor. Otherwise: for Move the
     // engine drives the container cursor on hover (handle-aware), so leave it undefined; the rest
     // are static here.
@@ -350,6 +381,11 @@ export const CanvasStage = forwardRef<CanvasStageHandle, CanvasStageProps>(
               engineRef.current?.fillAt(e.clientX, e.clientY)
               return
             }
+            if (props.tool === "marquee") {
+              e.currentTarget.setPointerCapture(e.pointerId)
+              engineRef.current?.beginSelection(e.clientX, e.clientY)
+              return
+            }
             e.currentTarget.setPointerCapture(e.pointerId)
             engineRef.current?.beginStroke(e.clientX, e.clientY)
           }}
@@ -360,6 +396,10 @@ export const CanvasStage = forwardRef<CanvasStageHandle, CanvasStageProps>(
                 panBy(e.clientX - last.x, e.clientY - last.y)
                 lastPanRef.current = { x: e.clientX, y: e.clientY }
               }
+              return
+            }
+            if (props.tool === "marquee") {
+              engineRef.current?.updateSelection(e.clientX, e.clientY, e.shiftKey)
               return
             }
             engineRef.current?.continueStroke(e.clientX, e.clientY, e.shiftKey)
@@ -376,6 +416,13 @@ export const CanvasStage = forwardRef<CanvasStageHandle, CanvasStageProps>(
               }
               return
             }
+            if (props.tool === "marquee") {
+              engineRef.current?.endSelection()
+              if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+                e.currentTarget.releasePointerCapture(e.pointerId)
+              }
+              return
+            }
             engineRef.current?.endStroke()
             if (e.currentTarget.hasPointerCapture(e.pointerId)) {
               e.currentTarget.releasePointerCapture(e.pointerId)
@@ -386,6 +433,10 @@ export const CanvasStage = forwardRef<CanvasStageHandle, CanvasStageProps>(
               panningRef.current = false
               lastPanRef.current = null
               setGrabbing(false)
+              return
+            }
+            if (props.tool === "marquee") {
+              engineRef.current?.endSelection()
               return
             }
             engineRef.current?.endStroke()

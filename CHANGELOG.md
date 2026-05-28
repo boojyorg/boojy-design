@@ -9,6 +9,19 @@ the `.design` file-format version is tracked separately in `src/lib/designFile.t
 
 _Nothing yet._
 
+## [0.2.0] — 2026-05-27
+
+### Added
+
+- **Marquee tool** (`M`) — rectangular selection with marching-ants animation. Draw a box, then:
+  - **⌘C** copy the selected region of the active layer into an internal clipboard.
+  - **⌘X** cut (copy + clear the region, undoable).
+  - **⌫ Delete** clear the selected region (undoable).
+  - **⌘V** paste as a new "Pasted" layer on top, offset 16 px — move it with the Move tool.
+  - **Escape** or clicking without dragging clears the selection.
+  - Switching tools clears the selection automatically.
+  - Copy/clear are transform-aware: correctly handles rotated/scaled layers.
+
 ## [0.1.0] — 2026-05-27
 
 First tagged release: the V1 "Classic" shell plus a working MVP paint loop on the Konva engine.

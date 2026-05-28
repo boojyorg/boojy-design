@@ -10,6 +10,7 @@ import {
   type PixelPort,
   runDeleteLayer,
   runDuplicateLayer,
+  runPasteLayer,
   runUndoable,
 } from "@/editor/state/commands"
 import { useDocumentStore } from "@/editor/state/documentStore"
@@ -122,6 +123,22 @@ export function EditorV1() {
     (id: string) => runDuplicateLayer(id, newLayerId(), pixelPort, record),
     [pixelPort, record],
   )
+  const onCopy = useCallback(() => stageRef.current?.copySelection(), [])
+  const onCut = useCallback(() => stageRef.current?.cutSelection(), [])
+  const onDelete = useCallback(() => stageRef.current?.deleteSelection(), [])
+  const onPaste = useCallback(() => {
+    const clip = stageRef.current?.getClipboard()
+    if (!clip) return
+    runPasteLayer(
+      newLayerId(),
+      clip,
+      { x: 16, y: 16, scaleX: 1, scaleY: 1, rotation: 0 },
+      "Pasted",
+      pixelPort,
+      record,
+    )
+  }, [pixelPort, record])
+
   useKeyboardShortcuts(dispatch, {
     onExport,
     onOpen: onOpenDocument,
@@ -132,6 +149,10 @@ export function EditorV1() {
     onZoomOut: () => nudgeZoom(-1),
     onZoomFit: fitView,
     onZoom100: zoom100,
+    onCopy,
+    onCut,
+    onPaste,
+    onDelete,
   })
 
   return (
@@ -213,6 +234,7 @@ export function EditorV1() {
             activeLayerId={activeLayerId}
             onRequestImageLayer={(name) => addLayer(name, "image")}
             onSampleColor={(hex) => dispatch({ type: "applySampledColor", color: hex })}
+            onSelectLayer={(id) => selectLayer(id)}
           />
           <RightSidebar
             collapsed={state.rightCollapsed}

@@ -11,10 +11,12 @@ import { hexToRgb, rgbaToHex } from "@/editor/Canvas/engine/color"
 import { drawImageContain } from "@/editor/Canvas/engine/draw"
 import { floodFill } from "@/editor/Canvas/engine/fill"
 import { flattenLayers } from "@/editor/Canvas/engine/flatten"
+import { clearRegion, copyRegion } from "@/editor/Canvas/engine/selection"
 import { drawEllipse, drawRect, normalizeRect } from "@/editor/Canvas/engine/shape"
 import { type Bounds, contentBounds } from "@/editor/Canvas/engine/thumbnail"
 import {
   apply,
+  type Box,
   boxCorners,
   flipHorizontal,
   flipVertical,
@@ -150,9 +152,21 @@ export class CanvasEngine {
   // React can refresh that layer's thumbnail. NOT fired on move — a move only shifts the display
   // offset, and thumbnails show buffer content, so the pixels are unchanged.
   private onLayerPixelsChanged?: (layerId: string) => void
+  private onLayerAutoSelected?: (layerId: string) => void
   // Latest Shift state for the shape constraint — updated by pointer moves *and* by
   // raw Shift key events, so the preview tracks Shift even while the pointer is still.
   private shiftDown = false
+  // Marquee selection: doc-space axis-aligned rect, drag origin, clipboard canvas.
+  private selectionRect: Box | null = null
+  private marqueeStart: Point | null = null
+  private clipboard: HTMLCanvasElement | null = null
+  // Dedicated screen-space layer for the marching-ants marquee (separate from the Move overlay
+  // so renderOverlay() can rebuild Move handles without destroying the marquee shapes).
+  private marqueeLayer: Konva.Layer | null = null
+  // Stored refs to the dashed Konva.Lines so the animation can update dashOffset in-place.
+  private marqueeLines: Konva.Line[] = []
+  private marqueeDashOffset = 0
+  private marqueeAnimFrame: number | null = null
 
   mount(container: HTMLDivElement) {
     // Capability guard: jsdom's getContext returns null (or throws). Bail before
@@ -191,6 +205,9 @@ export class CanvasEngine {
     // regardless of zoom. Visual only — pointer events still route through React → the engine.
     this.overlay = new Konva.Layer({ listening: false })
     this.stage.add(this.overlay)
+    // Marquee layer: separate from the Move overlay so the two don't stomp each other.
+    this.marqueeLayer = new Konva.Layer({ listening: false })
+    this.stage.add(this.marqueeLayer)
 
     this.applyView()
 
@@ -199,6 +216,7 @@ export class CanvasEngine {
   }
 
   unmount() {
+    this.stopMarqueeAnim()
     this.resizeObserver?.disconnect()
     this.resizeObserver = null
     this.stage?.destroy()
@@ -206,6 +224,8 @@ export class CanvasEngine {
     this.layer = null
     this.page = null
     this.overlay = null
+    this.marqueeLayer = null
+    this.marqueeLines = []
     this.container = null
     this.nodes.clear()
     this.strokeCanvas = null
@@ -217,7 +237,9 @@ export class CanvasEngine {
   }
 
   setBrush(brush: BrushParams) {
+    const prevTool = this.brush.tool
     this.brush = brush
+    if (prevTool === "marquee" && brush.tool !== "marquee") this.clearSelection()
     this.renderOverlay() // show/hide the selection overlay as the active tool changes
   }
 
@@ -254,6 +276,8 @@ export class CanvasEngine {
         if (layer.background) {
           created.ctx.fillStyle = PAGE_BACKGROUND
           created.ctx.fillRect(0, 0, DOC_WIDTH, DOC_HEIGHT)
+          // Trigger thumbnail so the Layers panel shows the white fill immediately.
+          this.notifyPixels(layer.id)
         }
       }
       node.image.visible(layer.visible)
@@ -278,6 +302,10 @@ export class CanvasEngine {
       this.nodes.get(layer.id)?.image.moveToTop()
     }
     this.page?.moveToBottom()
+    // The page rect is the structural white paper. Mirror the background layer's visibility
+    // so hiding it reveals transparency (checkerboard) like any other layer.
+    const bgLayer = layers.find((l) => l.background)
+    if (bgLayer && this.page) this.page.visible(bgLayer.visible)
     this.layer.batchDraw()
     this.renderOverlay()
   }
@@ -303,11 +331,26 @@ export class CanvasEngine {
     this.strokeLayerId = this.activeLayerId
 
     if (this.brush.tool === "select") {
-      // Free transform: a handle picks scale/rotate, inside the box moves, outside is a no-op.
-      // All non-destructive — only the layer's transform changes, never its pixels.
+      // Free transform: a handle picks scale/rotate, inside the box moves.
+      // Before committing to any gesture, check whether a layer *above* the current one
+      // has a non-transparent pixel at the click point — if so, auto-select it instead.
+      // This handles the common case of clicking a layer that sits on top of the active
+      // one (e.g. clicking Layer 1 while Background is active).
+      const activeIndex = this.layers.findIndex((l) => l.id === this.activeLayerId)
+      const topHit = this.pixelHitLayer(point, 0, activeIndex)
+      if (topHit) {
+        this.target = null
+        this.onLayerAutoSelected?.(topHit)
+        return
+      }
+
+      // No layer above is hit — apply the normal gesture (handles or box interior).
       const gesture = this.hitTest(point)
       if (!gesture) {
         this.target = null
+        // Miss on the current layer too: walk layers below for a hit.
+        const belowHit = this.pixelHitLayer(point, activeIndex + 1)
+        if (belowHit) this.onLayerAutoSelected?.(belowHit)
         return
       }
       this.moveStart = point
@@ -468,6 +511,105 @@ export class CanvasEngine {
     this.onMoveCommitted?.({ layerId: this.activeLayerId, before, after })
   }
 
+  // ── marquee selection ──────────────────────────────────────────────────────
+
+  /** Start a marquee drag at the given screen point. */
+  beginSelection(clientX: number, clientY: number) {
+    const point = this.screenToDoc(clientX, clientY)
+    if (!point) return
+    this.marqueeStart = point
+    this.selectionRect = null
+    this.renderMarquee()
+  }
+
+  /** Update the in-progress selection rect as the pointer moves. */
+  updateSelection(clientX: number, clientY: number, shiftKey = false) {
+    if (!this.marqueeStart) return
+    const cur = this.screenToDoc(clientX, clientY)
+    if (!cur) return
+    const dx = Math.abs(cur.x - this.marqueeStart.x)
+    const dy = Math.abs(cur.y - this.marqueeStart.y)
+    const size = shiftKey ? Math.min(dx, dy) : null
+    const w = size ?? dx
+    const h = size ?? dy
+    const x = size
+      ? cur.x < this.marqueeStart.x
+        ? this.marqueeStart.x - size
+        : this.marqueeStart.x
+      : Math.min(this.marqueeStart.x, cur.x)
+    const y = size
+      ? cur.y < this.marqueeStart.y
+        ? this.marqueeStart.y - size
+        : this.marqueeStart.y
+      : Math.min(this.marqueeStart.y, cur.y)
+    this.selectionRect = { x, y, w, h }
+    this.renderMarquee()
+  }
+
+  /** Finish the drag. A sub-2px drag is treated as a click → clear the selection. */
+  endSelection() {
+    this.marqueeStart = null
+    const r = this.selectionRect
+    if (!r || r.w < 2 || r.h < 2) {
+      this.selectionRect = null
+      this.renderMarquee()
+    }
+  }
+
+  /** Dismiss the selection (tool switch / Escape / empty click). */
+  clearSelection() {
+    this.selectionRect = null
+    this.marqueeStart = null
+    this.renderMarquee()
+  }
+
+  /** Copy the active layer's pixels inside the selection into the internal clipboard.
+   *  Returns true when a non-empty selection existed and was copied. */
+  copySelection(): boolean {
+    if (!this.selectionRect) return false
+    const node = this.nodes.get(this.activeLayerId)
+    if (!node) return false
+    const out = document.createElement("canvas")
+    out.width = DOC_WIDTH
+    out.height = DOC_HEIGHT
+    copyRegion(node.canvas, this.getLayerTransform(this.activeLayerId), this.selectionRect, out)
+    this.clipboard = out
+    return true
+  }
+
+  /** Cut = copy then delete the selected pixels. No-op without a selection. */
+  cutSelection() {
+    if (!this.copySelection()) return
+    this.deleteSelection()
+  }
+
+  /** Clear the selected region on the active layer, committed to the undo timeline. */
+  deleteSelection() {
+    if (!this.selectionRect) return
+    const target = this.nodes.get(this.activeLayerId)
+    if (!target?.image.visible()) return
+    const before = this.cloneCanvas(target.canvas)
+    clearRegion(
+      target.ctx,
+      this.getLayerTransform(this.activeLayerId),
+      this.selectionRect,
+      DOC_WIDTH,
+      DOC_HEIGHT,
+    )
+    this.layer?.batchDraw()
+    this.onStrokeCommitted?.({
+      layerId: this.activeLayerId,
+      before,
+      after: this.cloneCanvas(target.canvas),
+    })
+    this.notifyPixels(this.activeLayerId)
+  }
+
+  /** The internal clipboard canvas (a full doc-space buffer with the copied region), or null. */
+  getClipboard(): HTMLCanvasElement | null {
+    return this.clipboard
+  }
+
   endStroke() {
     const target = this.target
     if (!target) return
@@ -538,6 +680,12 @@ export class CanvasEngine {
   /** Subscribe to per-layer pixel changes (the chrome refreshes that layer's thumbnail). */
   setOnLayerPixelsChanged(cb: (layerId: string) => void) {
     this.onLayerPixelsChanged = cb
+  }
+
+  /** Subscribe to auto-select: fires when a Move-tool click misses the current layer and
+   *  hits a different one (top-most visible layer with a non-transparent pixel wins). */
+  setOnLayerAutoSelected(cb: (layerId: string) => void) {
+    this.onLayerAutoSelected = cb
   }
 
   /** Overwrite a layer's pixels with a snapshot (undo/redo restore). Public so the
@@ -819,6 +967,7 @@ export class CanvasEngine {
     this.layer.position({ x: view.x, y: view.y })
     this.layer.batchDraw()
     this.renderOverlay() // handles are screen-space — reposition them on zoom/resize
+    this.renderMarquee() // marquee is screen-space too — reposition on zoom/pan
   }
 
   /** Map a screen-space pointer to document space using the current view transform. */
@@ -907,6 +1056,24 @@ export class CanvasEngine {
 
   /** Which gesture a doc-space press starts: the rotate grip, a scale handle (0–7), a move (inside
    *  the box) or null (outside). Grip first (it sits outside the box), then handles, then interior. */
+  /** Walk `this.layers[from..to)` top→bottom and return the first visible layer id that has
+   *  a non-transparent pixel at `point` (doc-space, transform-aware). `to` defaults to end. */
+  private pixelHitLayer(point: Point, from = 0, to = this.layers.length): string | null {
+    for (let i = from; i < to; i++) {
+      const layer = this.layers[i]
+      if (!layer?.visible) continue
+      const node = this.nodes.get(layer.id)
+      if (!node) continue
+      const local = invert(this.getLayerTransform(layer.id), point)
+      const px = Math.round(local.x)
+      const py = Math.round(local.y)
+      if (px < 0 || py < 0 || px >= DOC_WIDTH || py >= DOC_HEIGHT) continue
+      const [, , , a] = node.ctx.getImageData(px, py, 1, 1).data
+      if ((a ?? 0) > 0) return layer.id
+    }
+    return null
+  }
+
   private hitTest(pressDoc: Point): Gesture | null {
     const box = this.activeContentBox()
     if (!box) return null
@@ -1011,6 +1178,79 @@ export class CanvasEngine {
       )
     }
     ov.batchDraw()
+  }
+
+  /** Render the marching-ants marquee rect. Rebuilds the two dashed Konva.Lines on the
+   *  dedicated marqueeLayer, then starts the animation loop to march the dashes. */
+  private renderMarquee() {
+    this.stopMarqueeAnim()
+    const ml = this.marqueeLayer
+    if (!ml) return
+    ml.destroyChildren()
+    this.marqueeLines = []
+
+    if (!this.selectionRect) {
+      ml.batchDraw()
+      return
+    }
+
+    const { x, y, w, h } = this.selectionRect
+    const pts = [
+      { x, y },
+      { x: x + w, y },
+      { x: x + w, y: y + h },
+      { x, y: y + h },
+    ]
+      .map((c) => this.docToScreen(c))
+      .flatMap((c) => [c.x, c.y])
+
+    // Two stacked lines: white underlay + black overlay with offset dashes = "marching ants".
+    const white = new Konva.Line({
+      points: pts,
+      closed: true,
+      stroke: "#ffffff",
+      strokeWidth: 1,
+      dash: [4, 4],
+      dashOffset: this.marqueeDashOffset,
+      listening: false,
+    })
+    const dark = new Konva.Line({
+      points: pts,
+      closed: true,
+      stroke: "#000000",
+      strokeWidth: 1,
+      dash: [4, 4],
+      dashOffset: this.marqueeDashOffset + 4,
+      listening: false,
+    })
+    ml.add(white)
+    ml.add(dark)
+    this.marqueeLines = [white, dark]
+    ml.batchDraw()
+
+    this.startMarqueeAnim()
+  }
+
+  /** Increment dashOffset each frame — shapes are updated in-place, no Konva rebuild. */
+  private startMarqueeAnim() {
+    const tick = () => {
+      this.marqueeDashOffset = (this.marqueeDashOffset + 0.4) % 8
+      for (const line of this.marqueeLines) line.dashOffset(this.marqueeDashOffset)
+      this.marqueeLayer?.batchDraw()
+      if (this.selectionRect && this.marqueeLines.length > 0) {
+        this.marqueeAnimFrame = requestAnimationFrame(tick)
+      } else {
+        this.marqueeAnimFrame = null
+      }
+    }
+    this.marqueeAnimFrame = requestAnimationFrame(tick)
+  }
+
+  private stopMarqueeAnim() {
+    if (this.marqueeAnimFrame !== null) {
+      cancelAnimationFrame(this.marqueeAnimFrame)
+      this.marqueeAnimFrame = null
+    }
   }
 }
 

@@ -85,6 +85,36 @@ export function runDeleteLayer(port: PixelPort, record: (command: Command) => vo
 }
 
 /**
+ * Paste a region as a new layer (the clipboard canvas), undoable. Pre-stashes the pixels
+ * so the layers-effect paints them into the node on the first sync. Mirrors `runDuplicateLayer`
+ * but has no source layer — the caller supplies the canvas and the layer name.
+ */
+export function runPasteLayer(
+  newId: string,
+  pixels: HTMLCanvasElement,
+  transform: Transform,
+  name: string,
+  port: PixelPort,
+  record: (command: Command) => void,
+): void {
+  const before = snapshot()
+  port.stashPixelRestore(newId, pixels)
+  useDocumentStore.getState().pasteLayer(newId, name)
+  port.setLayerTransform(newId, transform)
+  const after = snapshot()
+  if (sameDoc(before, after)) return
+  record({
+    label: "paste",
+    undo: () => restore(before),
+    redo: () => {
+      port.stashPixelRestore(newId, pixels)
+      port.setLayerTransform(newId, transform)
+      restore(after)
+    },
+  })
+}
+
+/**
  * Duplicate a layer (copy above the source, activated), undoable. Snapshots the
  * source's pixels *now* and replays that snapshot on every (re)do, so redo is
  * deterministic even if the source is painted on or removed afterwards.

@@ -1,15 +1,15 @@
 # Boojy Design — web image editor
 
 [![CI](https://github.com/tyrbujac/boojy-design/actions/workflows/ci.yml/badge.svg)](https://github.com/tyrbujac/boojy-design/actions/workflows/ci.yml)
-[![version](https://img.shields.io/badge/version-0.1.0-E89940)](./CHANGELOG.md)
+[![version](https://img.shields.io/badge/version-0.2.0-E89940)](./CHANGELOG.md)
 
 A web image editor built on the **V1 "Classic"** layout: top bar, left tool rail, canvas, and a
 collapsible right sidebar.
 
-> **Status: active side-project (v0.1.0).** The UI shell is live and the design direction is
+> **Status: active side-project (v0.2.0).** The UI shell is live and the design direction is
 > confirmed. The Konva canvas engine has landed and the MVP paint loop works — paint, shapes, fill,
-> layers, transform, undo/redo, import/export, and `.design` save/open — all behind a clean seam
-> (`CanvasStage` → `Canvas/engine/`).
+> layers, transform, selection, undo/redo, import/export, and `.design` save/open — all behind a
+> clean seam (`CanvasStage` → `Canvas/engine/`).
 
 ## Features
 
@@ -30,6 +30,10 @@ collapsible right sidebar.
   pixels intact): ⌘Z / ⌘⇧Z.
 - **Document** — import images (open or drag-drop), save/open `.design` files (⌘S / ⌘O), export
   PNG (⌘E).
+- **Marquee** — drag a rectangle to select a region (`M`); marching-ants animation tracks the
+  selection. **⌘C** copy · **⌘X** cut · **⌫** delete the selected pixels (all undoable) ·
+  **⌘V** paste as a new layer offset 16 px (move it with the Move tool). Escape or an empty
+  click clears the selection; switching tools clears it automatically.
 - **Navigation** — scroll to pan · pinch / ⌘-scroll to zoom toward the cursor · Space-drag or the
   Hand tool to pan · a preset zoom ladder on +/- · ⌘0 fit / ⌘1 100%.
 
@@ -55,9 +59,9 @@ small Zustand stores.
 ```
 
 Key paths: `src/editor/` (regions), `src/editor/Canvas/engine/` (the engine + pure math —
-`viewport.ts`, `transform.ts`, `flatten.ts`, `fill.ts`), `src/editor/state/` (the stores),
-`src/lib/designFile.ts` (the `.design` format), `src/theme/` (Tailwind v4 tokens — swap
-`accent.design.css` to reskin for another Boojy product).
+`viewport.ts`, `transform.ts`, `flatten.ts`, `fill.ts`, `selection.ts`), `src/editor/state/`
+(the stores), `src/lib/designFile.ts` (the `.design` format), `src/theme/` (Tailwind v4 tokens
+— swap `accent.design.css` to reskin for another Boojy product).
 
 ## Stack
 
@@ -81,18 +85,19 @@ tests) · Storybook · Biome · pnpm.
 
 ## What's next
 
-- **Move: skew** (shear — flip H/V already shipped).
 - **Text tool** — present in the rail, dimmed (`coming in v0.5`).
 - **Blend modes** (per-layer).
-- Later: selection/marquee, gradients, and tiling for larger documents.
+- **Marquee: paint masking** — constrain brush/fill/eraser to the selected region (deferred from v0.2).
+- Later: lasso selection, gradients, and tiling for larger documents.
+- Move **skew** (shear) deferred to v1.0.
 
 Features are sequenced deliberately — an 8-feature MVP cap is the discipline lever, not a hard limit.
 Full history in [CHANGELOG.md](./CHANGELOG.md).
 
 ## Project health
 
-- **Tests:** 151 across two Vitest projects — `dom` (jsdom shell/wiring, engine no-ops) and `node`
-  (real `@napi-rs/canvas` pixel tests for the engine math).
+- **Tests:** 175 across two Vitest projects — `dom` (jsdom shell/wiring, engine no-ops) and `node`
+  (real `@napi-rs/canvas` pixel tests for the engine math, incl. `selection.test.ts`).
 - **CI:** every push/PR runs lint → test → build → build-storybook, then deploys to Cloudflare Pages
   (preview per PR, production on `main`; secret-guarded).
 - **Gates:** Biome (lint/format/import order), strict TypeScript, pre-commit (lint + typecheck) and
