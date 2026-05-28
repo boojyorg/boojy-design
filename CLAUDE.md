@@ -40,6 +40,7 @@ Three load-bearing rules:
 * **CI-green is the gate, not local `pnpm test`.** CI also runs build + build-storybook; a change can pass `pnpm test` yet fail CI on a lint nit or Storybook break.
 * **Canvas / engine / visual features need a `pnpm dev` walkthrough *before* merge.** The engine no-ops under jsdom, so automated tests cover pure logic but never live drag, paint, or render.
 * **Stack PRs that touch the same file.** When a milestone needs several single-concern PRs that edit the same module or the docs (e.g. the quality pass: #26→#27→#28), branch each off the previous and stack them — parallel branches off `main` collide on that file (the merge hotspot `dreams.md` warns about). Retarget each base down to `main` as the one below it squash-merges.
+  * **Merging a stack — order matters, and don't `--delete-branch` early.** Deleting a PR's base branch **auto-closes** any child PR stacked on it (and a closed PR can't be reopened once its base is gone). So either (a) retarget every child's base to `main` *first*, then merge bottom-up, or (b) merge bottom-up and only `--delete-branch` once nothing is stacked on it. After each squash-merge, the merged work lands on `main` as a *new* commit, so rebase the next branch with `git rebase --onto main <old-base-sha>` before its PR (otherwise its diff re-shows the lower changes). Learned the hard way: a careless `--delete-branch` on #26 closed #27/#28 and forced reopening them as #29/#30.
 
 ## Architecture
 
