@@ -13,6 +13,7 @@ import { floodFill } from "@/editor/Canvas/engine/fill"
 import { flattenLayers } from "@/editor/Canvas/engine/flatten"
 import { clearRegion, copyRegion, flipRegion } from "@/editor/Canvas/engine/selection"
 import { drawEllipse, drawRect, normalizeRect } from "@/editor/Canvas/engine/shape"
+import { caretIndexAt, drawText, textContentBox } from "@/editor/Canvas/engine/text"
 import { type Bounds, contentBounds } from "@/editor/Canvas/engine/thumbnail"
 import {
   apply,
@@ -918,6 +919,7 @@ export class CanvasEngine {
   hitTestTextLayer(clientX: number, clientY: number): string | null {
     const point = this.screenToDoc(clientX, clientY)
     if (!point) return null
+    const ctx = this.scratchCtx()
     for (const layer of this.layers) {
       if (!layer.visible) continue
       const tn = this.textNodes.get(layer.id)
@@ -925,18 +927,8 @@ export class CanvasEngine {
       const text = tn.text.text()
       if (!text) continue
       const local = invert(this.getLayerTransform(layer.id), point)
-      const fontSize = tn.text.fontSize()
-      let w = fontSize * text.length * 0.6
-      try {
-        const tmp = document.createElement("canvas").getContext("2d")
-        if (tmp) {
-          tmp.font = `${fontSize}px sans-serif`
-          w = tmp.measureText(text).width
-        }
-      } catch {
-        /* ignore */
-      }
-      if (local.x >= 0 && local.x <= w && local.y >= 0 && local.y <= fontSize * 1.3) return layer.id
+      const box = textContentBox(ctx, text, tn.text.fontSize())
+      if (local.x >= 0 && local.x <= box.w && local.y >= 0 && local.y <= box.h) return layer.id
     }
     return null
   }
@@ -952,21 +944,7 @@ export class CanvasEngine {
     // localX: distance from the text origin in doc space (single-line, no rotation for now).
     const docPt = this.screenToDoc(clientX, 0)
     const localX = docPt ? docPt.x - t.x : 0
-    const fontSize = tn.text.fontSize()
-    try {
-      const tmp = document.createElement("canvas").getContext("2d")
-      if (!tmp) return 0
-      tmp.font = `${fontSize}px sans-serif`
-      let prev = 0
-      for (let i = 1; i <= text.length; i++) {
-        const w = tmp.measureText(text.slice(0, i)).width
-        if (localX < (prev + w) / 2) return i - 1
-        prev = w
-      }
-      return text.length
-    } catch {
-      return 0
-    }
+    return caretIndexAt(this.scratchCtx(), text, tn.text.fontSize(), localX)
   }
 
   /** A PNG data URL preview for the Layers panel. For text layers renders the text string; for
@@ -1165,6 +1143,15 @@ export class CanvasEngine {
     this.layer?.batchDraw()
   }
 
+  /** A throwaway 2D context for text measuring. Null under jsdom (no canvas backend). */
+  private scratchCtx(): CanvasRenderingContext2D | null {
+    try {
+      return document.createElement("canvas").getContext("2d")
+    } catch {
+      return null
+    }
+  }
+
   /** Copy a document-space canvas into a fresh one (for history snapshots). */
   private cloneCanvas(source: HTMLCanvasElement): HTMLCanvasElement {
     const copy = document.createElement("canvas")
@@ -1307,10 +1294,7 @@ export class CanvasEngine {
       ctx = null
     }
     if (!ctx) return null
-    ctx.font = `${tn.text.fontSize()}px sans-serif`
-    ctx.fillStyle = tn.text.fill() as string
-    ctx.textBaseline = "top"
-    ctx.fillText(text, 0, 0)
+    drawText(ctx, text, tn.text.fontSize(), tn.text.fill() as string)
     return canvas
   }
 
@@ -1347,18 +1331,7 @@ export class CanvasEngine {
         this.contentBoxCache = { layerId: id, box: null }
         return null
       }
-      const fontSize = tn.text.fontSize()
-      let textWidth = fontSize * text.length * 0.6
-      try {
-        const tmp = document.createElement("canvas").getContext("2d")
-        if (tmp) {
-          tmp.font = `${fontSize}px sans-serif`
-          textWidth = tmp.measureText(text).width
-        }
-      } catch {
-        /* ignore */
-      }
-      const box: Bounds = { x: 0, y: 0, w: textWidth, h: fontSize * 1.3 }
+      const box = textContentBox(this.scratchCtx(), text, tn.text.fontSize())
       this.contentBoxCache = { layerId: id, box }
       return box
     }

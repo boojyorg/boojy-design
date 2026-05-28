@@ -64,6 +64,58 @@
 - [ ] **UI Bug:** Add manual observations from `pnpm dev` walkthroughs here.
 
 ### 🚨 Automated Engine Incident Logs (Script Prepended)
+- [ ] **Fix TypeScript Typecheck Failure in `/Users/tyrbujac/Documents/Projects/boojy/boojy-design/src/editor/Canvas/engine/CanvasEngine.ts`**
+  ```text
+  
+> boojy-design@0.4.0 typecheck /Users/tyrbujac/Documents/Projects/boojy/boojy-design
+> tsc -b --noEmit
+
+src/editor/Canvas/engine/CanvasEngine.ts(922,22): error TS2339: Property 'scratchCtx' does not exist on type 'CanvasEngine'.
+src/editor/Canvas/engine/CanvasEngine.ts(947,30): error TS2339: Property 'scratchCtx' does not exist on type 'CanvasEngine'.
+src/editor/Canvas/engine/CanvasEngine.ts(1325,39): error TS2339: Property 'scratchCtx' does not exist on type 'CanvasEngine'.
+ ELIFECYCLE  Command failed with exit code 2.
+  ```
+- [ ] **Fix TypeScript Typecheck Failure in `/Users/tyrbujac/Documents/Projects/boojy/boojy-design/src/editor/Canvas/engine/CanvasEngine.ts`**
+  ```text
+  
+> boojy-design@0.4.0 typecheck /Users/tyrbujac/Documents/Projects/boojy/boojy-design
+> tsc -b --noEmit
+
+src/editor/Canvas/engine/CanvasEngine.ts(922,22): error TS2339: Property 'scratchCtx' does not exist on type 'CanvasEngine'.
+src/editor/Canvas/engine/CanvasEngine.ts(947,30): error TS2339: Property 'scratchCtx' does not exist on type 'CanvasEngine'.
+ ELIFECYCLE  Command failed with exit code 2.
+  ```
+- [ ] **Fix TypeScript Typecheck Failure in `/Users/tyrbujac/Documents/Projects/boojy/boojy-design/src/editor/Canvas/engine/CanvasEngine.ts`**
+  ```text
+  
+> boojy-design@0.4.0 typecheck /Users/tyrbujac/Documents/Projects/boojy/boojy-design
+> tsc -b --noEmit
+
+src/editor/Canvas/engine/CanvasEngine.ts(16,24): error TS6133: 'drawText' is declared but its value is never read.
+src/editor/Canvas/engine/CanvasEngine.ts(922,22): error TS2339: Property 'scratchCtx' does not exist on type 'CanvasEngine'.
+src/editor/Canvas/engine/CanvasEngine.ts(947,30): error TS2339: Property 'scratchCtx' does not exist on type 'CanvasEngine'.
+ ELIFECYCLE  Command failed with exit code 2.
+  ```
+- [ ] **Fix TypeScript Typecheck Failure in `/Users/tyrbujac/Documents/Projects/boojy/boojy-design/src/editor/Canvas/engine/CanvasEngine.ts`**
+  ```text
+  
+> boojy-design@0.4.0 typecheck /Users/tyrbujac/Documents/Projects/boojy/boojy-design
+> tsc -b --noEmit
+
+src/editor/Canvas/engine/CanvasEngine.ts(16,10): error TS6133: 'caretIndexAt' is declared but its value is never read.
+src/editor/Canvas/engine/CanvasEngine.ts(16,24): error TS6133: 'drawText' is declared but its value is never read.
+src/editor/Canvas/engine/CanvasEngine.ts(922,22): error TS2339: Property 'scratchCtx' does not exist on type 'CanvasEngine'.
+ ELIFECYCLE  Command failed with exit code 2.
+  ```
+- [ ] **Fix TypeScript Typecheck Failure in `/Users/tyrbujac/Documents/Projects/boojy/boojy-design/src/editor/Canvas/engine/CanvasEngine.ts`**
+  ```text
+  
+> boojy-design@0.4.0 typecheck /Users/tyrbujac/Documents/Projects/boojy/boojy-design
+> tsc -b --noEmit
+
+src/editor/Canvas/engine/CanvasEngine.ts(16,1): error TS6192: All imports in import declaration are unused.
+ ELIFECYCLE  Command failed with exit code 2.
+  ```
 
 _None open. (Cleared 2026-05-28 — all prior `0.3.0` typecheck entries were intermediate dev errors, resolved on the merged v0.4.0 branch; `pnpm typecheck` green.)_
 
