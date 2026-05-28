@@ -31,3 +31,36 @@ export function contentBounds(
   if (maxX < 0) return null // nothing opaque anywhere
   return { x: minX, y: minY, w: maxX - minX + 1, h: maxY - minY + 1 }
 }
+
+/**
+ * Fit a raster layer's content box into a `w`×`h` thumbnail context, centred. Upscaling is
+ * allowed so a small mark still reads large. Ctx-taking — the caller owns the thumbnail canvas.
+ */
+export function drawRasterThumbnail(
+  ctx: CanvasRenderingContext2D,
+  source: CanvasImageSource,
+  bounds: Bounds,
+  w: number,
+  h: number,
+): void {
+  const scale = Math.min(w / bounds.w, h / bounds.h)
+  const dw = bounds.w * scale
+  const dh = bounds.h * scale
+  ctx.drawImage(source, bounds.x, bounds.y, bounds.w, bounds.h, (w - dw) / 2, (h - dh) / 2, dw, dh)
+}
+
+/** Draw a text layer's first glyphs into a thumbnail context, vertically centred. Font size is
+ *  capped to ~⅔ of the thumbnail height so long/large text still fits. */
+export function drawTextThumbnail(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  fontSize: number,
+  color: string,
+  h: number,
+): void {
+  const fs = Math.min(fontSize, Math.round(h * 0.65))
+  ctx.font = `${fs}px sans-serif`
+  ctx.fillStyle = color
+  ctx.textBaseline = "middle"
+  ctx.fillText(text.slice(0, 14), 4, h / 2)
+}

@@ -8,7 +8,12 @@ import { clearRegion, copyRegion, flipRegion } from "@/editor/Canvas/engine/sele
 import { drawEllipse, drawRect, normalizeRect } from "@/editor/Canvas/engine/shape"
 import { compositeStroke, stampInto } from "@/editor/Canvas/engine/stroke"
 import { caretIndexAt, drawText, textContentBox } from "@/editor/Canvas/engine/text"
-import { type Bounds, contentBounds } from "@/editor/Canvas/engine/thumbnail"
+import {
+  type Bounds,
+  contentBounds,
+  drawRasterThumbnail,
+  drawTextThumbnail,
+} from "@/editor/Canvas/engine/thumbnail"
 import {
   apply,
   type Box,
@@ -948,22 +953,10 @@ export class CanvasEngine {
     if (tn) {
       const text = tn.text.text()
       if (!text) return null
-      const thumb = document.createElement("canvas")
-      thumb.width = w
-      thumb.height = h
-      let ctx: CanvasRenderingContext2D | null = null
-      try {
-        ctx = thumb.getContext("2d")
-      } catch {
-        ctx = null
-      }
-      if (!ctx) return null
-      const fs = Math.min(tn.text.fontSize(), Math.round(h * 0.65))
-      ctx.font = `${fs}px sans-serif`
-      ctx.fillStyle = tn.text.fill() as string
-      ctx.textBaseline = "middle"
-      ctx.fillText(text.slice(0, 14), 4, h / 2)
-      return thumb.toDataURL("image/png")
+      const thumb = this.makeCanvas(w, h)
+      if (!thumb) return null
+      drawTextThumbnail(thumb.ctx, text, tn.text.fontSize(), tn.text.fill() as string, h)
+      return thumb.canvas.toDataURL("image/png")
     }
 
     const node = this.nodes.get(layerId)
@@ -975,33 +968,10 @@ export class CanvasEngine {
     )
     if (!bounds) return null // blank layer → no thumbnail
 
-    const thumb = document.createElement("canvas")
-    thumb.width = w
-    thumb.height = h
-    let ctx: CanvasRenderingContext2D | null = null
-    try {
-      ctx = thumb.getContext("2d")
-    } catch {
-      ctx = null
-    }
-    if (!ctx) return null
-
-    // Fit the content box into the thumbnail (upscaling allowed, so a small mark reads large).
-    const scale = Math.min(w / bounds.w, h / bounds.h)
-    const dw = bounds.w * scale
-    const dh = bounds.h * scale
-    ctx.drawImage(
-      node.canvas,
-      bounds.x,
-      bounds.y,
-      bounds.w,
-      bounds.h,
-      (w - dw) / 2,
-      (h - dh) / 2,
-      dw,
-      dh,
-    )
-    return thumb.toDataURL("image/png")
+    const thumb = this.makeCanvas(w, h)
+    if (!thumb) return null
+    drawRasterThumbnail(thumb.ctx, node.canvas, bounds, w, h)
+    return thumb.canvas.toDataURL("image/png")
   }
 
   /**
@@ -1144,6 +1114,23 @@ export class CanvasEngine {
     } catch {
       return null
     }
+  }
+
+  /** A fresh w×h canvas + its 2D context, or null under jsdom (no canvas backend). */
+  private makeCanvas(
+    w: number,
+    h: number,
+  ): { canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D } | null {
+    const canvas = document.createElement("canvas")
+    canvas.width = w
+    canvas.height = h
+    let ctx: CanvasRenderingContext2D | null = null
+    try {
+      ctx = canvas.getContext("2d")
+    } catch {
+      ctx = null
+    }
+    return ctx ? { canvas, ctx } : null
   }
 
   /** Copy a document-space canvas into a fresh one (for history snapshots). */

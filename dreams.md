@@ -64,6 +64,36 @@
 - [ ] **UI Bug:** Add manual observations from `pnpm dev` walkthroughs here.
 
 ### 🚨 Automated Engine Incident Logs (Script Prepended)
+- [ ] **Fix TypeScript Typecheck Failure in `/Users/tyrbujac/Documents/Projects/boojy/boojy-design/tests/pixel/thumbnail.test.ts`**
+  ```text
+  
+> boojy-design@0.4.0 typecheck /Users/tyrbujac/Documents/Projects/boojy/boojy-design
+> tsc -b --noEmit
+
+tests/pixel/thumbnail.test.ts(1,1): error TS6133: 'createCanvas' is declared but its value is never read.
+tests/pixel/thumbnail.test.ts(5,3): error TS6133: 'drawRasterThumbnail' is declared but its value is never read.
+tests/pixel/thumbnail.test.ts(6,3): error TS6133: 'drawTextThumbnail' is declared but its value is never read.
+ ELIFECYCLE  Command failed with exit code 2.
+  ```
+- [ ] **Fix TypeScript Typecheck Failure in `/Users/tyrbujac/Documents/Projects/boojy/boojy-design/src/editor/Canvas/engine/CanvasEngine.ts`**
+  ```text
+  
+> boojy-design@0.4.0 typecheck /Users/tyrbujac/Documents/Projects/boojy/boojy-design
+> tsc -b --noEmit
+
+src/editor/Canvas/engine/CanvasEngine.ts(953,7): error TS2304: Cannot find name 'drawTextThumbnail'.
+src/editor/Canvas/engine/CanvasEngine.ts(968,5): error TS2304: Cannot find name 'drawRasterThumbnail'.
+ ELIFECYCLE  Command failed with exit code 2.
+  ```
+- [ ] **Fix TypeScript Typecheck Failure in `/Users/tyrbujac/Documents/Projects/boojy/boojy-design/src/editor/Canvas/engine/CanvasEngine.ts`**
+  ```text
+  
+> boojy-design@0.4.0 typecheck /Users/tyrbujac/Documents/Projects/boojy/boojy-design
+> tsc -b --noEmit
+
+src/editor/Canvas/engine/CanvasEngine.ts(1150,11): error TS6133: 'makeCanvas' is declared but its value is never read.
+ ELIFECYCLE  Command failed with exit code 2.
+  ```
 - [ ] **Fix TypeScript Typecheck Failure in `/Users/tyrbujac/Documents/Projects/boojy/boojy-design/tests/pixel/color.test.ts`**
   ```text
   
