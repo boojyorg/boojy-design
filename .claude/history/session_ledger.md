@@ -27,7 +27,9 @@
 
 ### Notes
 
-MVP is closed. Next item is a fresh Post-MVP milestone (font picker / lasso / blend modes) — needs a scope plan before starting. Releases are version-bumped in `package.json` but **not** git-tagged beyond `v0.2.1`; decide whether to start tagging `v0.4.0`.
+MVP is closed and `v0.4.0` is now git-tagged (tagging back on track; `v0.3.0` deliberately not backfilled). Releases are version-bumped in `package.json` + CHANGELOG and tagged from here on.
+
+**Next session — repo structure & quality pass (NOT features).** Logged as the active target in `dreams.md` §1 and CLAUDE.md Roadmap. Goal: lower per-edit cost + merge pain before more features. Headline items: split `CanvasEngine.ts` (~1400 lines, top cost driver + merge hotspot) into pure/ctx-taking modules along seams; clear the 2 standing `noNonNullAssertion` warnings (CanvasEngine.ts ~420, ~803); resolve the >500 KB bundle warning; conventions sweep. Plan-mode first; small single-concern PRs; keep the `CanvasStage` → engine seam intact.
 
 ---
 

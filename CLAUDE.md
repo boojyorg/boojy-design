@@ -85,7 +85,16 @@ Konva is the chosen engine — the brush hot path clears 60fps at 2K/50 layers o
 
 * **Live text layers** — shipped. Click canvas to place; type; blur/tool-switch commits. Click an existing text layer with the Text tool to re-edit. Font size + color controls in the layers panel. Konva.Text node in the engine; `<textarea>` overlay in CanvasStage. Text serializes as metadata in `.design` (no pixels). Export composites via `ctx.fillText`. Undo captures whole content before/after commit. Font family picker, alignment, multi-line wrapping are post-MVP.
 
-### Post-MVP (deferred — don't start without a new milestone plan)
+### Next up — Repo structure & quality pass (not a feature; plan before starting)
+
+Post-MVP housekeeping to lower per-edit cost and merge pain before more features land. Do it in small, single-concern PRs, plan-mode first, keeping the `CanvasStage` → engine seam intact. Full checklist in `dreams.md` §1. Headline items:
+
+* **Split `CanvasEngine.ts` (~1400 lines)** along seams (text-node / selection-region / transform math / stroke hot path) as pure/ctx-taking modules — it's the top cost driver and the merge hotspot.
+* **Clear the 2 standing `noNonNullAssertion` lint warnings** in `CanvasEngine.ts` (lines ~420, ~803).
+* **Resolve the >500 KB bundle warning** — code-split the engine or raise the limit deliberately.
+* **Conventions sweep** — indexed-access safety, `import type`, no inline hex, helper test coverage.
+
+### Post-MVP features (deferred — don't start without a new milestone plan)
 
 * Lasso / freehand selection
 * Text formatting: font family picker, alignment (left/center/right), multi-line

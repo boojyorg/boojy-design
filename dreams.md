@@ -1,8 +1,20 @@
 # DREAMS.md — Boojy Design Intent Buffer & Devlog
 
-## 1. 🎯 Active Engineering Target — NONE (MVP complete)
+## 1. 🎯 Active Engineering Target — Repo structure & quality pass (post-MVP)
 
-**Status (2026-05-28):** ✅ **MVP shipped.** v0.4.0 merged to `main` via PR #25 (live text layers); v0.3.0 layer opacity merged via #24. Branch `feat/layer-opacity` carried both — opacity was de-duplicated against main during the merge. No active target. Next item needs a fresh milestone plan from the Post-MVP backlog (see §3 / CLAUDE.md Roadmap) before work starts.
+**Goal (set 2026-05-28, for next session):** MVP is shipped (v0.4.0). Before adding more features, do a deliberate **structure + quality pass** to lower the per-edit cost, reduce merge pain, and tidy the codebase. This is housekeeping, not new features — confirm scope/sequencing at the start of the session before touching code.
+
+> ⚠️ **Plan first.** This is a multi-file refactor touching the load-bearing engine. Use plan mode, agree the seams, and do it in small reviewable PRs (one concern each) — not one big-bang branch. Keep the `CanvasStage` → engine seam intact.
+
+### Candidate work (prioritise at session start — roughly highest-leverage first)
+
+- [ ] **Split `CanvasEngine.ts` (~1400 lines).** It is both the biggest cost driver (hook re-reads the whole file every edit; 31% of usage is >150k context) **and** the merge hotspot (this session's 8-file conflict centred on it). Proposed seams, extracted as pure/ctx-taking modules behind the engine: (a) text-node logic, (b) selection/region ops, (c) transform math, (d) stroke/paint hot path. Verify pixel tests still pass per extraction.
+- [ ] **Clear the 2 standing lint warnings** — `noNonNullAssertion` at `CanvasEngine.ts:420` (`target!.canvas`) and `:803` (`target!.canvas`). Replace `target!` with a proper guard/destructure (these have ridden along as warnings since before this session).
+- [ ] **Bundle size** — `pnpm build` warns the main chunk is >500 KB (≈637 KB / 197 KB gzip), Konva dominates. Decide: code-split (dynamic import the engine) vs. raise `chunkSizeWarningLimit` deliberately. Don't leave it as an unexplained warning.
+- [ ] **Conventions sweep** — confirm `noUncheckedIndexedAccess` handling, `import type` usage, no inline hex (design tokens only), and that pure helpers have node/dom test coverage. Small, mechanical — good Haiku work.
+- [ ] **Merge hygiene note** — the opacity duplication conflict happened because the branch outlived a `main` advance (#24 squash-merged the same feature). Going forward: merge/rebase `main` into long branches frequently, and squash-merge promptly so the same work doesn't land twice.
+
+---
 
 ### ✅ Shipped — v0.4.0 MVP (live text layers + layer opacity)
 
