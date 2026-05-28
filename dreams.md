@@ -1,10 +1,12 @@
 # DREAMS.md — Boojy Design Intent Buffer & Devlog
 
-## 1. 🎯 Active Engineering Target — v0.4.0 MVP (live text layers)
+## 1. 🎯 Active Engineering Target — NONE (MVP complete)
 
-**Goal:** Ship live text layers — the sole remaining item before MVP is declared complete.
+**Status (2026-05-28):** ✅ **MVP shipped.** v0.4.0 merged to `main` via PR #25 (live text layers); v0.3.0 layer opacity merged via #24. Branch `feat/layer-opacity` carried both — opacity was de-duplicated against main during the merge. No active target. Next item needs a fresh milestone plan from the Post-MVP backlog (see §3 / CLAUDE.md Roadmap) before work starts.
 
-### Step 1 — Layer opacity ✅
+### ✅ Shipped — v0.4.0 MVP (live text layers + layer opacity)
+
+#### Step 1 — Layer opacity ✅
 
 - [x] `opacity: number` (0–100) already in `Layer` type, `addLayer`, `pasteLayer`, `designFile` (serialize + deserialize)
 - [x] `documentStore`: `setLayerOpacity(id, opacity)` added
@@ -12,7 +14,7 @@
 - [x] Sidebar: opacity slider above layer list (hidden for Background); live drag via `onLiveOpacity` → `setLayerOpacity`; `onCommitOpacity` records one undo step with before captured via `onPointerDown` ref
 - [x] `pnpm dev` walkthrough: drag opacity slider, verify compositing, undo/redo ✅
 
-### Step 2 — Live text layers (engine + chrome)
+#### Step 2 — Live text layers (engine + chrome)
 
 - [x] Add `"text"` to `LayerType`; text fields (`textContent`, `fontSize`, `textColor`) on `Layer`
 - [x] `documentStore`: `addTextLayer`, `setLayerText`, `setLayerFontSize`, `setLayerTextColor` actions
@@ -24,7 +26,7 @@
 - [x] `LayersPanel`: font size input + color picker when active layer is `"text"`; threaded through `RightSidebar` + stories
 - [x] Test cleanup: replaced stale "Text tool is v0.5 placeholder" assertions with MVP equivalents
 
-### Step 3 — Hybrid UX model + walkthrough bug fixes
+#### Step 3 — Hybrid UX model + walkthrough bug fixes
 
 - [x] Visual fix: textarea `color: transparent` + `caretColor` so Konva.Text is the only rendered surface while typing
 - [x] Move tool on text: loosened `!target` guards in `beginStroke`/`continueStroke`/`endStroke`; text layers now draggable + resizable via Move tool
@@ -50,72 +52,8 @@
 - [ ] **UI Bug:** Add manual observations from `pnpm dev` walkthroughs here.
 
 ### 🚨 Automated Engine Incident Logs (Script Prepended)
-- [ ] **Fix TypeScript Typecheck Failure in `/Users/tyrbujac/Documents/Projects/boojy/boojy-design/src/editor/RightSidebar/LayersPanel.tsx`**
-  ```text
-  
-> boojy-design@0.3.0 typecheck /Users/tyrbujac/Documents/Projects/boojy/boojy-design
-> tsc -b --noEmit
 
-src/editor/RightSidebar/LayersPanel.tsx(191,3): error TS6133: 'liveLayerFontSize' is declared but its value is never read.
- ELIFECYCLE  Command failed with exit code 2.
-  ```
-- [ ] **Fix TypeScript Typecheck Failure in `/Users/tyrbujac/Documents/Projects/boojy/boojy-design/src/editor/RightSidebar/RightSidebar.tsx`**
-  ```text
-  
-> boojy-design@0.3.0 typecheck /Users/tyrbujac/Documents/Projects/boojy/boojy-design
-> tsc -b --noEmit
-
-src/editor/RightSidebar/RightSidebar.tsx(82,11): error TS2322: Type '{ layers: Layer[]; activeLayerId: string; onSelect: (id: string) => void; onToggle: (id: string) => void; onAdd: () => void; onDelete: () => void; onRename: (id: string, name: string) => void; ... 6 more ...; onTextColor: ((id: string, color: string) => void) | undefined; }' is not assignable to type 'IntrinsicAttributes & LayersPanelProps'.
-  Property 'liveLayerFontSize' does not exist on type 'IntrinsicAttributes & LayersPanelProps'.
- ELIFECYCLE  Command failed with exit code 2.
-  ```
-- [ ] **Fix TypeScript Typecheck Failure in `/Users/tyrbujac/Documents/Projects/boojy/boojy-design/src/editor/RightSidebar/RightSidebar.tsx`**
-  ```text
-  
-> boojy-design@0.3.0 typecheck /Users/tyrbujac/Documents/Projects/boojy/boojy-design
-> tsc -b --noEmit
-
-src/editor/RightSidebar/RightSidebar.tsx(45,3): error TS6133: 'liveLayerFontSize' is declared but its value is never read.
- ELIFECYCLE  Command failed with exit code 2.
-  ```
-- [ ] **Fix TypeScript Typecheck Failure in `/Users/tyrbujac/Documents/Projects/boojy/boojy-design/src/editor/EditorV1.tsx`**
-  ```text
-  
-> boojy-design@0.3.0 typecheck /Users/tyrbujac/Documents/Projects/boojy/boojy-design
-> tsc -b --noEmit
-
-src/editor/EditorV1.tsx(355,13): error TS2322: Type '{ collapsed: boolean; layers: Layer[]; activeLayerId: string; onSelectLayer: (id: string) => void; onToggleLayer: (id: string) => void; onAddLayer: () => void; onDeleteLayer: () => void; onRenameLayer: (id: string, name: string) => void; ... 6 more ...; onTextColor: (id: string, color: string) => void; }' is not assignable to type 'IntrinsicAttributes & RightSidebarProps'.
-  Property 'liveLayerFontSize' does not exist on type 'IntrinsicAttributes & RightSidebarProps'.
- ELIFECYCLE  Command failed with exit code 2.
-  ```
-- [ ] **Fix TypeScript Typecheck Failure in `/Users/tyrbujac/Documents/Projects/boojy/boojy-design/src/editor/EditorV1.tsx`**
-  ```text
-  
-> boojy-design@0.3.0 typecheck /Users/tyrbujac/Documents/Projects/boojy/boojy-design
-> tsc -b --noEmit
-
-src/editor/EditorV1.tsx(170,10): error TS6133: 'liveTextFontSize' is declared but its value is never read.
- ELIFECYCLE  Command failed with exit code 2.
-  ```
-- [ ] **Fix TypeScript Typecheck Failure in `/Users/tyrbujac/Documents/Projects/boojy/boojy-design/src/editor/EditorV1.tsx`**
-  ```text
-  
-> boojy-design@0.3.0 typecheck /Users/tyrbujac/Documents/Projects/boojy/boojy-design
-> tsc -b --noEmit
-
-src/editor/EditorV1.tsx(170,10): error TS6133: 'liveTextFontSize' is declared but its value is never read.
-src/editor/EditorV1.tsx(172,9): error TS6133: 'onLiveTextScale' is declared but its value is never read.
- ELIFECYCLE  Command failed with exit code 2.
-  ```
-- [ ] **Fix TypeScript Typecheck Failure in `/Users/tyrbujac/Documents/Projects/boojy/boojy-design/src/editor/EditorV1.tsx`**
-  ```text
-  
-> boojy-design@0.3.0 typecheck /Users/tyrbujac/Documents/Projects/boojy/boojy-design
-> tsc -b --noEmit
-
-src/editor/EditorV1.tsx(168,9): error TS6133: 'onTextScaleCommit' is declared but its value is never read.
- ELIFECYCLE  Command failed with exit code 2.
-  ```
+_None open. (Cleared 2026-05-28 — all prior `0.3.0` typecheck entries were intermediate dev errors, resolved on the merged v0.4.0 branch; `pnpm typecheck` green.)_
 
 <!-- The post-edit-validation hook automatically injects compiler/test errors beneath this line -->
 
@@ -129,7 +67,7 @@ src/editor/EditorV1.tsx(168,9): error TS6133: 'onTextScaleCommit' is declared bu
 - **Hook tax on large files:** Editing `CanvasEngine.ts` (1400+ lines) incurs Biome reformat + typecheck + vitest per edit, plus a mandatory re-read after reformat. Budget ~3–4 round trips per logical change. Prefer batching multi-site edits.
 - **Text layer `renderOverlay` gate**: must check both `node?.image.visible()` (raster) AND `textNodes.has(activeLayerId)` — forgetting either hides Move handles for one type.
 - **`beginStroke`/`continueStroke`/`endStroke` text guard**: select tool on a text layer has no raster `target`; all three guards need the `|| (tool === "select" && textNodes.has(strokeLayerId))` bypass.
-- **v0.4.0 session plan:** Layer opacity shipped as v0.3.0. Live text layers implemented; `pnpm dev` walkthrough remaining before tagging v0.4.0.
+- **v0.4.0 shipped (2026-05-28):** Layer opacity (v0.3.0, #24) + live text layers (v0.4.0, #25) both on `main`. MVP complete. `package.json` at 0.4.0; not git-tagged (v0.3.0 wasn't tagged either — only v0.2.1 exists).
 - **Deferred post-MVP (confirmed 2026-05-28):** Lasso, font family picker, text alignment, blend modes, elliptical marquee, skew/shear, paint masking.
 - **Text layers are always live** — no rasterize action. Text layer data serializes as metadata in `.design`; base64 PNG only for raster layers.
 - **Float-drag undo model:** Two commands (cut → paste at final position). One ⌘Z removes the float layer; second ⌘Z restores source pixels. Acceptable MVP behaviour.

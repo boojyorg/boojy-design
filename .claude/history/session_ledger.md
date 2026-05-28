@@ -2,6 +2,35 @@
 
 ---
 
+## 2026-05-28 · v0.4.0 release — merge main, resolve conflicts, ship MVP · feat/layer-opacity → main
+
+### Session Work
+
+| Task | Outcome |
+|---|---|
+| Pre-PR conflict check | Found `main` had advanced: opacity already merged via #24 (`fc97264`), duplicating the branch's own opacity commit `8791167` |
+| Merge `origin/main` | 8 files conflicted; resolved each by dropping duplicated opacity hunks, keeping text-only additions (documentStore, EditorV1, LayersPanel, RightSidebar(+stories), CanvasStage, CLAUDE.md, dreams.md) |
+| Release v0.4.0 (never actually cut) | `package.json` 0.3.0 → 0.4.0; CHANGELOG 0.4.0 entry; README badge 0.2.1→0.4.0 + status + new Text feature bullet + fixed stale "Text coming in v0.5"; CLAUDE roadmap → MVP-complete |
+| Chore | Dropped `opusplan` model pin from `.claude/settings.json` |
+| PR #25 | Opened against `main`, CI green (Lint·Test·Build pass, preview deployed), squash-merged + branch deleted |
+| Ledger / dreams hygiene | Added this entry; flipped dreams active-target → "MVP complete, no active target"; cleared stale `0.3.0` incident logs |
+
+### Gates
+
+| Gate | Result |
+|---|---|
+| typecheck | green |
+| lint | exit 0 (2 pre-existing CanvasEngine non-null-assertion warnings, untouched) |
+| test | 178 pass (26 files) |
+| build | green |
+| Manual walkthrough | text place/re-edit/move/resize/dbl-click/undo/save+reopen — passed (user-confirmed) |
+
+### Notes
+
+MVP is closed. Next item is a fresh Post-MVP milestone (font picker / lasso / blend modes) — needs a scope plan before starting. Releases are version-bumped in `package.json` but **not** git-tagged beyond `v0.2.1`; decide whether to start tagging `v0.4.0`.
+
+---
+
 ## 2026-05-28 · text resize baking + stretch + live size · feat/layer-opacity
 
 ### Session Work
