@@ -32,12 +32,17 @@ interface CanvasStageProps {
   fillTolerance: number
   layers: Layer[]
   activeLayerId: string
+  hasMarqueeSelection?: boolean
   /** Ask the chrome to add an image-typed layer (the document store owns layer metadata). */
   onRequestImageLayer: (name: string) => void
   /** Eyedropper picked a colour (visible composite under the cursor). */
   onSampleColor: (hex: string) => void
   /** Move tool clicked a different layer — select it in the document store. */
   onSelectLayer: (id: string) => void
+  /** Marquee selection established or cleared — drives flip-button enabled state. */
+  onMarqueeSelectionChange?: (hasSelection: boolean) => void
+  /** Float-drag ended: caller creates the permanent pasted layer and switches to Move. */
+  onFloatEnd?: (clip: HTMLCanvasElement, transform: Transform) => void
 }
 
 /** The narrow imperative surface the engine exposes across the seam. */
@@ -56,6 +61,8 @@ export interface CanvasStageHandle {
   clearTransforms: () => void
   /** Flip the active layer horizontally or vertically (undoable). */
   flipActiveLayer: (axis: "h" | "v") => void
+  /** Flip the pixels inside the active marquee selection (undoable). No-op without a selection. */
+  flipSelection: (axis: "h" | "v") => void
   /** Copy the selected region of the active layer into the internal clipboard. Returns true if there was a selection. */
   copySelection: () => boolean
   /** Cut the selected region (copy + delete). No-op without a selection. */
@@ -123,6 +130,7 @@ export const CanvasStage = forwardRef<CanvasStageHandle, CanvasStageProps>(
           engineRef.current?.setLayerTransform(layerId, transform),
         clearTransforms: () => engineRef.current?.clearTransforms(),
         flipActiveLayer: (axis) => engineRef.current?.flipActiveLayer(axis),
+        flipSelection: (axis) => engineRef.current?.flipSelection(axis),
         copySelection: () => engineRef.current?.copySelection() ?? false,
         cutSelection: () => engineRef.current?.cutSelection(),
         deleteSelection: () => engineRef.current?.deleteSelection(),
@@ -180,7 +188,20 @@ export const CanvasStage = forwardRef<CanvasStageHandle, CanvasStageProps>(
       engineRef.current?.setOnLayerAutoSelected((layerId) => {
         props.onSelectLayer(layerId)
       })
-    }, [record, setThumbnail, removeThumbnail, props.onSelectLayer])
+      engineRef.current?.setOnSelectionChanged((hasSelection) => {
+        props.onMarqueeSelectionChange?.(hasSelection)
+      })
+      engineRef.current?.setOnFloatEnd((clip, transform) => {
+        props.onFloatEnd?.(clip, transform)
+      })
+    }, [
+      record,
+      setThumbnail,
+      removeThumbnail,
+      props.onSelectLayer,
+      props.onMarqueeSelectionChange,
+      props.onFloatEnd,
+    ])
 
     useEffect(() => {
       engineRef.current?.setBrush({
@@ -337,15 +358,17 @@ export const CanvasStage = forwardRef<CanvasStageHandle, CanvasStageProps>(
       props.tool === "eyedropper" ||
       props.tool === "fill" ||
       props.tool === "marquee"
-    // Pan mode (Space held or Hand tool) wins over every tool cursor. Otherwise: for Move the
-    // engine drives the container cursor on hover (handle-aware), so leave it undefined; the rest
-    // are static here.
+    // Pan mode (Space held or Hand tool) wins over every tool cursor. Otherwise: for Move, and
+    // for Marquee when a selection is active, the engine drives the container cursor on hover
+    // (handle- or hit-test-aware). All other tools use a static cursor.
     const panMode = spaceDown || props.tool === "hand"
+    const engineDrivesCursor =
+      props.tool === "select" || (props.tool === "marquee" && !!props.hasMarqueeSelection)
     const cursor = grabbing
       ? "grabbing"
       : panMode
         ? "grab"
-        : props.tool === "select"
+        : engineDrivesCursor
           ? undefined
           : showCrosshair
             ? "crosshair"
@@ -400,6 +423,7 @@ export const CanvasStage = forwardRef<CanvasStageHandle, CanvasStageProps>(
             }
             if (props.tool === "marquee") {
               engineRef.current?.updateSelection(e.clientX, e.clientY, e.shiftKey)
+              engineRef.current?.pointerHover(e.clientX, e.clientY)
               return
             }
             engineRef.current?.continueStroke(e.clientX, e.clientY, e.shiftKey)

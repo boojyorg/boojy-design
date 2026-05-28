@@ -1,6 +1,6 @@
 import { type Canvas, createCanvas } from "@napi-rs/canvas"
 import { describe, expect, it } from "vitest"
-import { clearRegion, copyRegion } from "@/editor/Canvas/engine/selection"
+import { clearRegion, copyRegion, flipRegion } from "@/editor/Canvas/engine/selection"
 import { IDENTITY, type Transform } from "@/editor/Canvas/engine/transform"
 
 // Real-canvas pixel tests (node project, @napi-rs/canvas). Cast contexts to the DOM types
@@ -106,5 +106,89 @@ describe("clearRegion", () => {
     expect(px(data, 2, 0)[3]).toBe(0)
     // Buffer pixels x=4..7 (which show at doc x=8..11, off-canvas) are untouched
     expect(px(data, 6, 0)).toEqual([0, 0, 255, 255])
+  })
+})
+
+// ── flipRegion ────────────────────────────────────────────────────────────────
+
+describe("flipRegion", () => {
+  it("horizontal flip mirrors left half to right half (identity, full rect)", () => {
+    // Source: left half red, right half transparent.
+    // After H flip over the full rect the left half becomes transparent and the right half red.
+    const c = createCanvas(W, H)
+    const ctx = c.getContext("2d")
+    ctx.fillStyle = "#ff0000"
+    ctx.fillRect(0, 0, W / 2, H)
+    const scratch = createCanvas(W, H)
+
+    flipRegion(
+      c as unknown as HTMLCanvasElement,
+      ctx as unknown as CanvasRenderingContext2D,
+      IDENTITY,
+      { x: 0, y: 0, w: W, h: H },
+      "h",
+      scratch as unknown as HTMLCanvasElement,
+      W,
+      H,
+    )
+
+    const data = c.getContext("2d").getImageData(0, 0, W, H).data as unknown as Uint8ClampedArray
+    expect(px(data, 1, 4)[3]).toBe(0) // was red, now clear
+    expect(px(data, 6, 4)).toEqual([255, 0, 0, 255]) // was clear, now red
+  })
+
+  it("vertical flip mirrors top half to bottom half (identity, full rect)", () => {
+    // Source: top half blue, bottom half transparent.
+    // After V flip the top becomes transparent and the bottom becomes blue.
+    const c = createCanvas(W, H)
+    const ctx = c.getContext("2d")
+    ctx.fillStyle = "#0000ff"
+    ctx.fillRect(0, 0, W, H / 2)
+    const scratch = createCanvas(W, H)
+
+    flipRegion(
+      c as unknown as HTMLCanvasElement,
+      ctx as unknown as CanvasRenderingContext2D,
+      IDENTITY,
+      { x: 0, y: 0, w: W, h: H },
+      "v",
+      scratch as unknown as HTMLCanvasElement,
+      W,
+      H,
+    )
+
+    const data = c.getContext("2d").getImageData(0, 0, W, H).data as unknown as Uint8ClampedArray
+    expect(px(data, 4, 1)[3]).toBe(0) // was blue, now clear
+    expect(px(data, 4, 6)).toEqual([0, 0, 255, 255]) // was clear, now blue
+  })
+
+  it("only flips pixels inside the sub-rect, leaving pixels outside unchanged", () => {
+    // Source: green at columns 2..3 (left half of sub-rect x=2, w=4).
+    // Pixels outside the rect (columns 0..1 and 6..7) are transparent and must stay so.
+    // After H flip within the sub-rect the green should land at columns 4..5.
+    const c = createCanvas(W, H)
+    const ctx = c.getContext("2d")
+    ctx.fillStyle = "#00ff00"
+    ctx.fillRect(2, 0, 2, H)
+    const scratch = createCanvas(W, H)
+
+    flipRegion(
+      c as unknown as HTMLCanvasElement,
+      ctx as unknown as CanvasRenderingContext2D,
+      IDENTITY,
+      { x: 2, y: 0, w: 4, h: H },
+      "h",
+      scratch as unknown as HTMLCanvasElement,
+      W,
+      H,
+    )
+
+    const data = c.getContext("2d").getImageData(0, 0, W, H).data as unknown as Uint8ClampedArray
+    expect(px(data, 2, 4)[3]).toBe(0) // cleared by flip
+    expect(px(data, 3, 4)[3]).toBe(0) // cleared by flip
+    expect(px(data, 4, 4)).toEqual([0, 255, 0, 255]) // flipped in
+    expect(px(data, 5, 4)).toEqual([0, 255, 0, 255]) // flipped in
+    expect(px(data, 0, 4)[3]).toBe(0) // outside rect, untouched
+    expect(px(data, 7, 4)[3]).toBe(0) // outside rect, untouched
   })
 })

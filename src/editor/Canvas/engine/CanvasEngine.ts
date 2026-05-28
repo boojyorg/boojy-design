@@ -11,7 +11,7 @@ import { hexToRgb, rgbaToHex } from "@/editor/Canvas/engine/color"
 import { drawImageContain } from "@/editor/Canvas/engine/draw"
 import { floodFill } from "@/editor/Canvas/engine/fill"
 import { flattenLayers } from "@/editor/Canvas/engine/flatten"
-import { clearRegion, copyRegion } from "@/editor/Canvas/engine/selection"
+import { clearRegion, copyRegion, flipRegion } from "@/editor/Canvas/engine/selection"
 import { drawEllipse, drawRect, normalizeRect } from "@/editor/Canvas/engine/shape"
 import { type Bounds, contentBounds } from "@/editor/Canvas/engine/thumbnail"
 import {
@@ -160,6 +160,15 @@ export class CanvasEngine {
   private selectionRect: Box | null = null
   private marqueeStart: Point | null = null
   private clipboard: HTMLCanvasElement | null = null
+  // Float-drag: extract selected pixels to a temp Konva.Image, move it with the pointer,
+  // commit as a new layer on pointer-up. Keeps undo to two steps (cut + paste).
+  private floatClip: HTMLCanvasElement | null = null
+  private floatImage: Konva.Image | null = null
+  private floatStart: Point | null = null
+  // Fires when a valid selection is established or dismissed (drives flip-button enable state).
+  private onSelectionChanged?: (hasSelection: boolean) => void
+  // Fires on float-drag end: the caller creates the permanent pasted layer.
+  private onFloatEnd?: (clip: HTMLCanvasElement, transform: Transform) => void
   // Dedicated screen-space layer for the marching-ants marquee (separate from the Move overlay
   // so renderOverlay() can rebuild Move handles without destroying the marquee shapes).
   private marqueeLayer: Konva.Layer | null = null
@@ -513,17 +522,77 @@ export class CanvasEngine {
 
   // ── marquee selection ──────────────────────────────────────────────────────
 
-  /** Start a marquee drag at the given screen point. */
+  /** Start a marquee drag. If the pointer lands inside an existing selection, begin a
+   *  float-drag instead: cut the region's pixels to a temporary overlay and track the drag. */
   beginSelection(clientX: number, clientY: number) {
     const point = this.screenToDoc(clientX, clientY)
     if (!point) return
+
+    const r = this.selectionRect
+    if (r && !this.marqueeStart && !this.floatStart) {
+      if (point.x >= r.x && point.x <= r.x + r.w && point.y >= r.y && point.y <= r.y + r.h) {
+        this.startFloat(point, r)
+        return
+      }
+    }
+
     this.marqueeStart = point
     this.selectionRect = null
     this.renderMarquee()
+    this.onSelectionChanged?.(false)
   }
 
-  /** Update the in-progress selection rect as the pointer moves. */
+  /** Cut the selection region and begin a float-drag, showing a temporary overlay image. */
+  private startFloat(origin: Point, rect: Box) {
+    const node = this.nodes.get(this.activeLayerId)
+    if (!node) return
+
+    const clip = document.createElement("canvas")
+    clip.width = DOC_WIDTH
+    clip.height = DOC_HEIGHT
+    const transform = this.getLayerTransform(this.activeLayerId)
+    copyRegion(node.canvas, transform, rect, clip)
+
+    const before = this.cloneCanvas(node.canvas)
+    clearRegion(node.ctx, transform, rect, DOC_WIDTH, DOC_HEIGHT)
+    this.layer?.batchDraw()
+    this.onStrokeCommitted?.({
+      layerId: this.activeLayerId,
+      before,
+      after: this.cloneCanvas(node.canvas),
+    })
+    this.notifyPixels(this.activeLayerId)
+
+    const floatImage = new Konva.Image({
+      image: clip,
+      x: 0,
+      y: 0,
+      width: DOC_WIDTH,
+      height: DOC_HEIGHT,
+      listening: false,
+    })
+    this.layer?.add(floatImage)
+    this.layer?.batchDraw()
+
+    this.floatClip = clip
+    this.floatImage = floatImage
+    this.floatStart = origin
+    this.selectionRect = null
+    this.renderMarquee()
+    this.onSelectionChanged?.(false)
+  }
+
+  /** Update the in-progress selection rect or float-drag position as the pointer moves. */
   updateSelection(clientX: number, clientY: number, shiftKey = false) {
+    if (this.floatStart && this.floatImage) {
+      const cur = this.screenToDoc(clientX, clientY)
+      if (!cur) return
+      this.floatImage.x(cur.x - this.floatStart.x)
+      this.floatImage.y(cur.y - this.floatStart.y)
+      this.layer?.batchDraw()
+      return
+    }
+
     if (!this.marqueeStart) return
     const cur = this.screenToDoc(clientX, clientY)
     if (!cur) return
@@ -542,25 +611,54 @@ export class CanvasEngine {
         ? this.marqueeStart.y - size
         : this.marqueeStart.y
       : Math.min(this.marqueeStart.y, cur.y)
-    this.selectionRect = { x, y, w, h }
+    // Snap to integer pixel boundaries so downstream pixel ops (copy/clear/flip) are exact.
+    const ix = Math.round(x)
+    const iy = Math.round(y)
+    this.selectionRect = { x: ix, y: iy, w: Math.round(x + w) - ix, h: Math.round(y + h) - iy }
     this.renderMarquee()
   }
 
-  /** Finish the drag. A sub-2px drag is treated as a click → clear the selection. */
+  /** Finish the drag. Float-drag commits the layer; sub-2px marquee drag clears selection. */
   endSelection() {
+    if (this.floatStart && this.floatImage) {
+      const dx = this.floatImage.x()
+      const dy = this.floatImage.y()
+      this.floatImage.destroy()
+      this.floatImage = null
+      this.layer?.batchDraw()
+      const clip = this.floatClip
+      this.floatClip = null
+      this.floatStart = null
+      if (clip) {
+        this.onFloatEnd?.(clip, { x: dx, y: dy, scaleX: 1, scaleY: 1, rotation: 0 })
+      }
+      return
+    }
+
     this.marqueeStart = null
     const r = this.selectionRect
     if (!r || r.w < 2 || r.h < 2) {
       this.selectionRect = null
       this.renderMarquee()
+      this.onSelectionChanged?.(false)
+    } else {
+      this.onSelectionChanged?.(true)
     }
   }
 
   /** Dismiss the selection (tool switch / Escape / empty click). */
   clearSelection() {
+    if (this.floatImage) {
+      this.floatImage.destroy()
+      this.floatImage = null
+      this.layer?.batchDraw()
+    }
+    this.floatClip = null
+    this.floatStart = null
     this.selectionRect = null
     this.marqueeStart = null
     this.renderMarquee()
+    this.onSelectionChanged?.(false)
   }
 
   /** Copy the active layer's pixels inside the selection into the internal clipboard.
@@ -686,6 +784,44 @@ export class CanvasEngine {
    *  hits a different one (top-most visible layer with a non-transparent pixel wins). */
   setOnLayerAutoSelected(cb: (layerId: string) => void) {
     this.onLayerAutoSelected = cb
+  }
+
+  /** Subscribe to marquee selection changes (fires when a valid selection is established or cleared). */
+  setOnSelectionChanged(cb: (hasSelection: boolean) => void) {
+    this.onSelectionChanged = cb
+  }
+
+  /** Subscribe to float-drag end: caller creates the permanent layer from the clip at the given transform. */
+  setOnFloatEnd(cb: (clip: HTMLCanvasElement, transform: Transform) => void) {
+    this.onFloatEnd = cb
+  }
+
+  /** Flip the pixels inside the active marquee selection along the given axis (undoable). */
+  flipSelection(axis: "h" | "v") {
+    if (!this.selectionRect) return
+    const node = this.nodes.get(this.activeLayerId)
+    if (!node?.image.visible()) return
+    const before = this.cloneCanvas(node.canvas)
+    const scratch = document.createElement("canvas")
+    scratch.width = DOC_WIDTH
+    scratch.height = DOC_HEIGHT
+    flipRegion(
+      node.canvas,
+      node.ctx,
+      this.getLayerTransform(this.activeLayerId),
+      this.selectionRect,
+      axis,
+      scratch,
+      DOC_WIDTH,
+      DOC_HEIGHT,
+    )
+    this.layer?.batchDraw()
+    this.onStrokeCommitted?.({
+      layerId: this.activeLayerId,
+      before,
+      after: this.cloneCanvas(node.canvas),
+    })
+    this.notifyPixels(this.activeLayerId)
   }
 
   /** Overwrite a layer's pixels with a snapshot (undo/redo restore). Public so the
@@ -1043,6 +1179,9 @@ export class CanvasEngine {
   private notifyPixels(layerId: string) {
     this.invalidateContentBox()
     this.onLayerPixelsChanged?.(layerId)
+    // Re-render the select overlay so handles appear immediately when the active layer's
+    // pixels arrive (e.g. after a float-drag paste, where restorePixels fires after syncLayers).
+    if (layerId === this.activeLayerId) this.renderOverlay()
   }
 
   /** Doc-space position of the rotate grip: above the box's top-edge centre, ROTATE_GRIP_DIST
@@ -1107,9 +1246,21 @@ export class CanvasEngine {
 
   /** Update the container cursor on hover — only while Move is active and not mid-drag. */
   pointerHover(clientX: number, clientY: number) {
-    if (!this.container || this.brush.tool !== "select" || this.moveStart) return
-    const point = this.screenToDoc(clientX, clientY)
-    this.container.style.cursor = this.cursorFor(point ? this.hitTest(point) : null)
+    if (!this.container) return
+    if (this.brush.tool === "select") {
+      if (this.moveStart) return
+      const point = this.screenToDoc(clientX, clientY)
+      this.container.style.cursor = this.cursorFor(point ? this.hitTest(point) : null)
+    } else if (this.brush.tool === "marquee") {
+      if (this.marqueeStart || this.floatStart) return
+      const point = this.screenToDoc(clientX, clientY)
+      const r = this.selectionRect
+      const inside =
+        point && r
+          ? point.x >= r.x && point.x <= r.x + r.w && point.y >= r.y && point.y <= r.y + r.h
+          : false
+      this.container.style.cursor = inside ? "move" : "crosshair"
+    }
   }
 
   /** Set the active cursor when a drag begins (rotate uses `grabbing`). */

@@ -9,6 +9,30 @@ the `.design` file-format version is tracked separately in `src/lib/designFile.t
 
 _Nothing yet._
 
+## [0.2.1] — 2026-05-28
+
+### Added
+
+- **Marquee flip** — Flip H and Flip V buttons appear in the top bar while the Marquee tool is
+  active; they enable once a selection rect is drawn and disable when the selection is dismissed.
+  Flips mirror the selected pixels within the rect in place, leaving pixels outside untouched.
+  Works correctly with rotated and scaled layers.
+- **Drag-to-float** — clicking and dragging inside an existing marquee selection cuts the selected
+  pixels to a temporary floating overlay that follows the cursor. Releasing drops them as a new
+  "Floated" layer at the destination, switches to the Move tool, and immediately shows the transform
+  handles on the new layer. Both the cut and the paste are undoable as separate steps.
+
+### Fixed
+
+- Marquee Flip H/V buttons were permanently disabled — `hasMarqueeSelection` and the flip callbacks
+  were declared on `TopBarProps` but not forwarded to `<ToolProperties>`.
+- Move-tool transform handles did not appear after a float-drag drop — `notifyPixels` invalidated
+  the content-box cache but never re-rendered the overlay; now calls `renderOverlay()`.
+- Flipping a selection twice left faint residual lines — `selectionRect` stored raw floating-point
+  `screenToDoc` coordinates, causing a non-integer flip-centre that bilinear-bleed edge pixels
+  outside the clear zone. Fixed by snapping the rect to integer pixel boundaries in `updateSelection`
+  and setting `imageSmoothingEnabled = false` in `copyRegion` and `flipRegion`.
+
 ## [0.2.0] — 2026-05-27
 
 ### Added
@@ -53,5 +77,7 @@ First tagged release: the V1 "Classic" shell plus a working MVP paint loop on th
   the Hand tool to pan, a Chrome-like preset zoom ladder on the +/- controls, and ⌘0 fit / ⌘1 100%.
 - **App version** — shown in the Design menu under "About Boojy Design".
 
-[Unreleased]: https://github.com/tyrbujac/boojy-design/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/tyrbujac/boojy-design/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/tyrbujac/boojy-design/compare/v0.2.0...v0.2.1
+[0.2.0]: https://github.com/tyrbujac/boojy-design/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/tyrbujac/boojy-design/releases/tag/v0.1.0
