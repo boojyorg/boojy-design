@@ -59,6 +59,7 @@ Two load-bearing rules:
 * **Automated Validation Hooks:** `.claude/settings.json` wires a `PostToolUse` hook (`.claude/hooks/post-edit-validation.sh`) that runs Biome auto-fix → `typecheck` → `vitest related` after every `.ts`/`.tsx` edit. Do not bypass it.
 * **Keep the docs current.** Architecture or roadmap changes update `README.md` and `CLAUDE.md` in the same commit. A shippable release bumps `version` in `package.json` and adds a `CHANGELOG.md` entry.
 * **App version** is `__APP_VERSION__` (Vite `define` from `package.json`) — distinct from the `.design` file-format version in `designFile.ts`.
+* **Memory Synchronization Rule:** Active workspace targets, unresolved terminal compilation failures, and manual UI testing bugs are centralized inside `dreams.md`. At the start of every session, read `dreams.md` to establish target context. Upon resolving an issue, update the corresponding markdown task checkbox from `- [ ]` to `- [x]`.
 
 ## Engine decision (resolved)
 
@@ -73,10 +74,12 @@ Shipped features (MVP cap = 8 features — the discipline lever, not a hard limi
 * **Eyedropper** — samples composited colour under cursor into foreground, then snaps back to the previous tool.
 * **Fill bucket** — contiguous flood fill with tolerance; composites under anti-aliased edges ("fill behind") to avoid a fringe ring.
 * **Move / free transform** — non-destructive 8-handle box (scale, rotate, move); transforms live in the engine, pixels never move in their buffer. Drag past opposite edge = mirror; Flip H/V buttons mirror in place. Arrow-key nudge. Auto-selects the topmost non-transparent layer on click.
-* **Marquee** (`M`) — rectangular region selection with marching-ants animation; ⌘C copy / ⌘X cut / ⌫ delete / ⌘V paste-as-new-layer; transform-aware copy/clear via `copyRegion`/`clearRegion` in `selection.ts`; clipboard canvas is caller-allocated.
+* **Marquee** (`M`) — rectangular region selection with marching-ants animation; ⌘C copy / ⌘X cut / ⌫ delete / ⌘V paste-as-new-layer; **Flip H/V** buttons in the top bar (enabled when a selection exists); **drag-to-float** cuts selected pixels to a temp overlay, drops as a new "Floated" layer on release (tool auto-switches to Move, handles appear immediately, both steps undoable); transform-aware copy/clear/flip via `copyRegion`/`clearRegion`/`flipRegion` in `selection.ts`; clipboard canvas is caller-allocated.
 * **Layers** — drag-reorder, rename, duplicate-with-pixels, delete, live thumbnails. Pinned locked **Background** layer at the bottom.
 * **Unified undo/redo** — one `Command` stack for strokes and every layer op, including undo-delete with pixels.
 * **Persistence** — save/open `.design` (JSON + per-layer base64 PNG); Export PNG (flattened); Image import.
 * **Viewport navigation** — scroll-to-pan, pinch/⌘-scroll zoom-toward-cursor, Space-drag, Hand tool, preset zoom ladder, ⌘0 fit / ⌘1 100%.
+
+* **Context Hygiene Gate:** Monitor session capacity metrics continuously. When context utilization crosses 50% (or total warm cache reads cross 500k tokens), immediately pause active tool loops, notify the user, summarize the architecture vector delta, and automatically execute the `/compact` command.
 
 **Next:** remaining v0.5 tools. **Deferred:** Text tool (v0.5), blend modes (v0.5+), skew/shear (v1.0), lasso/elliptical marquee, paint masking within selection. Don't pile features on at once — keep changes small and shippable.

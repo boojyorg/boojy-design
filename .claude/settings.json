@@ -1,5 +1,7 @@
 {
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
   "model": "opusplan",
+  "compactPrompt": "When compacting this development session, you MUST copy and preserve all current active tasks and bugs listed inside dreams.md verbatim. Retain all strict coordinate matrix rules from CLAUDE.md, explicit file paths modified during this branch, and the precise error signatures currently under evaluation. Discard historical conversational prose, greeting filler, and old CSS styling discussions.",
   "hooks": {
     "PostToolUse": [
       {

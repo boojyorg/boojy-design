@@ -1,4 +1,4 @@
-import { type ChangeEvent, useCallback, useMemo, useRef } from "react"
+import { type ChangeEvent, useCallback, useMemo, useRef, useState } from "react"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { CanvasStage, type CanvasStageHandle } from "@/editor/Canvas/CanvasStage"
 import { IDENTITY } from "@/editor/Canvas/engine/transform"
@@ -139,6 +139,21 @@ export function EditorV1() {
     )
   }, [pixelPort, record])
 
+  // Marquee flip + float-drag
+  const [hasMarqueeSelection, setHasMarqueeSelection] = useState(false)
+  const onMarqueeFlipH = useCallback(() => stageRef.current?.flipSelection("h"), [])
+  const onMarqueeFlipV = useCallback(() => stageRef.current?.flipSelection("v"), [])
+  const onFloatEnd = useCallback(
+    (
+      clip: HTMLCanvasElement,
+      transform: { x: number; y: number; scaleX: number; scaleY: number; rotation: number },
+    ) => {
+      runPasteLayer(newLayerId(), clip, transform, "Floated", pixelPort, record)
+      dispatch({ type: "setTool", tool: "select" })
+    },
+    [pixelPort, record, dispatch],
+  )
+
   useKeyboardShortcuts(dispatch, {
     onExport,
     onOpen: onOpenDocument,
@@ -188,6 +203,9 @@ export function EditorV1() {
           onFillTolerance={(value) => dispatch({ type: "setFillTolerance", value })}
           onFlipH={() => stageRef.current?.flipActiveLayer("h")}
           onFlipV={() => stageRef.current?.flipActiveLayer("v")}
+          hasMarqueeSelection={hasMarqueeSelection}
+          onMarqueeFlipH={onMarqueeFlipH}
+          onMarqueeFlipV={onMarqueeFlipV}
           onZoomIn={() => nudgeZoom(1)}
           onZoomOut={() => nudgeZoom(-1)}
           onZoomFit={fitView}
@@ -232,6 +250,9 @@ export function EditorV1() {
             fillTolerance={state.fillTolerance}
             layers={layers}
             activeLayerId={activeLayerId}
+            hasMarqueeSelection={hasMarqueeSelection}
+            onMarqueeSelectionChange={setHasMarqueeSelection}
+            onFloatEnd={onFloatEnd}
             onRequestImageLayer={(name) => addLayer(name, "image")}
             onSampleColor={(hex) => dispatch({ type: "applySampledColor", color: hex })}
             onSelectLayer={(id) => selectLayer(id)}

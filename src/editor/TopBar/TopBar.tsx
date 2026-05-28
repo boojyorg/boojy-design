@@ -23,6 +23,9 @@ interface TopBarProps {
   onFillTolerance: (v: number) => void
   onFlipH: () => void
   onFlipV: () => void
+  hasMarqueeSelection?: boolean
+  onMarqueeFlipH?: () => void
+  onMarqueeFlipV?: () => void
   onZoomIn: () => void
   onZoomOut: () => void
   onZoomFit: () => void
@@ -93,6 +96,9 @@ export function TopBar(props: TopBarProps) {
           onFillTolerance={props.onFillTolerance}
           onFlipH={props.onFlipH}
           onFlipV={props.onFlipV}
+          hasMarqueeSelection={props.hasMarqueeSelection}
+          onMarqueeFlipH={props.onMarqueeFlipH}
+          onMarqueeFlipV={props.onMarqueeFlipV}
         />
       </div>
 

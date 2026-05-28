@@ -32,8 +32,10 @@ collapsible right sidebar.
   PNG (⌘E).
 - **Marquee** — drag a rectangle to select a region (`M`); marching-ants animation tracks the
   selection. **⌘C** copy · **⌘X** cut · **⌫** delete the selected pixels (all undoable) ·
-  **⌘V** paste as a new layer offset 16 px (move it with the Move tool). Escape or an empty
-  click clears the selection; switching tools clears it automatically.
+  **⌘V** paste as a new layer · **Flip H/V** buttons in the top bar mirror the selection in place ·
+  **drag inside the selection** to lift pixels as a floating overlay and drop them as a new layer
+  at the destination (switches to Move tool with handles active; both steps undoable). Escape or
+  an empty click clears the selection; switching tools clears it automatically.
 - **Navigation** — scroll to pan · pinch / ⌘-scroll to zoom toward the cursor · Space-drag or the
   Hand tool to pan · a preset zoom ladder on +/- · ⌘0 fit / ⌘1 100%.
 

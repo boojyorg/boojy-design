@@ -13,6 +13,7 @@ interface ToolPropertiesProps {
   opacity: number
   foreground: string
   fillTolerance: number
+  hasMarqueeSelection?: boolean
   onBrushSize: (v: number) => void
   onHardness: (v: number) => void
   onOpacity: (v: number) => void
@@ -20,6 +21,8 @@ interface ToolPropertiesProps {
   onFillTolerance: (v: number) => void
   onFlipH: () => void
   onFlipV: () => void
+  onMarqueeFlipH?: () => void
+  onMarqueeFlipV?: () => void
 }
 
 function ToolProp({ label, children }: { label: string; children: ReactNode }) {
@@ -85,6 +88,7 @@ export function ToolProperties({
   opacity,
   foreground,
   fillTolerance,
+  hasMarqueeSelection,
   onBrushSize,
   onHardness,
   onOpacity,
@@ -92,6 +96,8 @@ export function ToolProperties({
   onFillTolerance,
   onFlipH,
   onFlipV,
+  onMarqueeFlipH,
+  onMarqueeFlipV,
 }: ToolPropertiesProps) {
   if (tool === "brush" || tool === "eraser") {
     return (
@@ -156,6 +162,27 @@ export function ToolProperties({
             <ColorChip color={foreground} />
           </ColorPopover>
         </ToolProp>
+      </div>
+    )
+  }
+
+  if (tool === "marquee") {
+    return (
+      <div className="flex items-center gap-1" data-testid="tool-props">
+        <IconButton
+          aria-label="Flip horizontal"
+          disabled={!hasMarqueeSelection}
+          onClick={onMarqueeFlipH}
+        >
+          <FlipHorizontal2 size={16} />
+        </IconButton>
+        <IconButton
+          aria-label="Flip vertical"
+          disabled={!hasMarqueeSelection}
+          onClick={onMarqueeFlipV}
+        >
+          <FlipVertical2 size={16} />
+        </IconButton>
       </div>
     )
   }
