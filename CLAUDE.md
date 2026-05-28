@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is (read first)
 
-Boojy Design is a web image editor built on the V1 "Classic" shell (top bar, left tool rail, canvas, right sidebar). The shell shipped and is confirmed; the Konva canvas engine has landed and the full MVP feature set is live. The app is tagged **v0.2.1** — see `CHANGELOG.md`.
+Boojy Design is a web image editor built on the V1 "Classic" shell (top bar, left tool rail, canvas, right sidebar). The app is tagged **v0.3.0** — see `CHANGELOG.md`. **v0.4.0 is the MVP cap** — one feature remains before MVP is declared complete: live text layers (see Roadmap).
 
 Two things that still shape any change:
 
@@ -43,7 +43,7 @@ Two load-bearing rules:
 ## Architecture
 
 * **`src/editor/`** — shell split by region: `TopBar/`, `LeftRail/`, `Canvas/`, `RightSidebar/`. `EditorV1.tsx` is the composition root — owns the shell reducer, reads stores, wraps layer ops in undo commands, orchestrates save/open; regions are otherwise presentational.
-* **`src/lib/tools.ts`** — tool registry with `mvp` flag. The lone non-MVP tool (Text) shows **dimmed with a tooltip**; shortcuts only fire for MVP tools.
+* **`src/lib/tools.ts`** — tool registry with `mvp` flag. The Text tool is dimmed until v0.3 ships it as a live-text layer; shortcuts only fire for active tools.
 * **`src/editor/types.ts`** — the layer model is intentionally thin. Transforms (`{x,y,scaleX,scaleY,rotation}`) live in the engine (`Map<layerId, Transform>` in `CanvasEngine`), not the model — "transforms are engine-phase." The one non-obvious metadata field is **`background?: boolean`** — the locked white Background layer pinned at the bottom, seeded white by the engine, guarded against delete/reorder/duplicate in `documentStore`.
 * **Design tokens (Tailwind v4):** `src/theme/base.tokens.css` holds shared Boojy tokens; `src/theme/accent.design.css` holds the per-product accent (amber — swap to reskin). Components use utilities (`bg-chrome`, `text-fg-dim`, `bg-accent`), never inline hex.
 * **Components:** `src/components/ui/` are shadcn-style Radix wrappers; `src/components/` are app primitives.
@@ -60,6 +60,7 @@ Two load-bearing rules:
 * **Keep the docs current.** Architecture or roadmap changes update `README.md` and `CLAUDE.md` in the same commit. A shippable release bumps `version` in `package.json` and adds a `CHANGELOG.md` entry.
 * **App version** is `__APP_VERSION__` (Vite `define` from `package.json`) — distinct from the `.design` file-format version in `designFile.ts`.
 * **Memory Synchronization Rule:** Active workspace targets, unresolved terminal compilation failures, and manual UI testing bugs are centralized inside `dreams.md`. At the start of every session, read `dreams.md` to establish target context. Upon resolving an issue, update the corresponding markdown task checkbox from `- [ ]` to `- [x]`.
+* **`viewportStore.zoom` is a percentage (0–100+), not a fraction (0–1).** Any screen-space scaling must use `zoom / 100`. Using `zoom` directly inflates sizes by 100×.
 
 ## Engine decision (resolved)
 
@@ -67,19 +68,33 @@ Konva is the chosen engine — the brush hot path clears 60fps at 2K/50 layers o
 
 ## Roadmap (sequence intentionally — confirm scope before starting a new item)
 
-Shipped features (MVP cap = 8 features — the discipline lever, not a hard limit):
+### Shipped (v0.1–v0.2.1)
 
-* **Brush & eraser** — raster paint; Shift = straight line snapped to 45°.
+* **Brush & eraser** — raster paint; Shift = straight line snapped to 45°. Live brush-size cursor ring (white + black shadow, zoom-aware).
+* **Layer opacity** — 0–100% slider in the layers panel; live during drag; single undo step per gesture; saved in `.design` and composited in PNG export.
 * **Shape tool** — drag-to-size rect/ellipse rasterized to the active layer; Shift = square/circle; picker floats beside the rail.
 * **Eyedropper** — samples composited colour under cursor into foreground, then snaps back to the previous tool.
 * **Fill bucket** — contiguous flood fill with tolerance; composites under anti-aliased edges ("fill behind") to avoid a fringe ring.
 * **Move / free transform** — non-destructive 8-handle box (scale, rotate, move); transforms live in the engine, pixels never move in their buffer. Drag past opposite edge = mirror; Flip H/V buttons mirror in place. Arrow-key nudge. Auto-selects the topmost non-transparent layer on click.
-* **Marquee** (`M`) — rectangular region selection with marching-ants animation; ⌘C copy / ⌘X cut / ⌫ delete / ⌘V paste-as-new-layer; **Flip H/V** buttons in the top bar (enabled when a selection exists); **drag-to-float** cuts selected pixels to a temp overlay, drops as a new "Floated" layer on release (tool auto-switches to Move, handles appear immediately, both steps undoable); transform-aware copy/clear/flip via `copyRegion`/`clearRegion`/`flipRegion` in `selection.ts`; clipboard canvas is caller-allocated.
+* **Marquee** (`M`) — rectangular region selection with marching-ants animation; ⌘C copy / ⌘X cut / ⌫ delete / ⌘V paste-as-new-layer; **Flip H/V** buttons in the top bar; **drag-to-float** cuts selected pixels to a temp overlay, drops as a new "Floated" layer on release (tool auto-switches to Move, both steps undoable); transform-aware copy/clear/flip via `copyRegion`/`clearRegion`/`flipRegion` in `selection.ts`.
 * **Layers** — drag-reorder, rename, duplicate-with-pixels, delete, live thumbnails. Pinned locked **Background** layer at the bottom.
 * **Unified undo/redo** — one `Command` stack for strokes and every layer op, including undo-delete with pixels.
 * **Persistence** — save/open `.design` (JSON + per-layer base64 PNG); Export PNG (flattened); Image import.
 * **Viewport navigation** — scroll-to-pan, pinch/⌘-scroll zoom-toward-cursor, Space-drag, Hand tool, preset zoom ladder, ⌘0 fit / ⌘1 100%.
 
-* **Context Hygiene Gate:** Monitor session capacity metrics continuously. When context utilization crosses 50% (or total warm cache reads cross 500k tokens), immediately pause active tool loops, notify the user, summarize the architecture vector delta, and automatically execute the `/compact` command.
+### v0.4.0 — MVP cap (current target)
 
-**Next:** remaining v0.5 tools. **Deferred:** Text tool (v0.5), blend modes (v0.5+), skew/shear (v1.0), lasso/elliptical marquee, paint masking within selection. Don't pile features on at once — keep changes small and shippable.
+One feature ships in v0.4.0; once merged, MVP is complete.
+
+* **Live text layers** — a permanent new layer kind (never rasterized). Click canvas to place; type; blur/tool-switch commits. Double-click to re-edit. Text layer data (`content`, `fontFamily`, `fontSize`, `color`) lives in the layer model and serializes as metadata (no base64 PNG). The engine renders a `Konva.Text` node; in-canvas editing uses a positioned `<textarea>` overlay. Font family picker, alignment, and multi-line wrapping are **post-MVP**. Export (flatten PNG) composites text layers via `ctx.fillText`. Undo is coarse (whole content before/after commit).
+
+### Post-MVP (deferred — don't start without a new milestone plan)
+
+* Lasso / freehand selection
+* Text formatting: font family picker, alignment (left/center/right), multi-line
+* Blend modes (multiply, screen, overlay — significant engine work)
+* Elliptical marquee
+* Skew / shear (v1.0)
+* Paint masking within selection
+
+* **Context Hygiene Gate:** Monitor session capacity metrics continuously. When context utilization crosses 50% (or total warm cache reads cross 500k tokens), immediately pause active tool loops, notify the user, summarize the architecture vector delta, and automatically execute the `/compact` command.

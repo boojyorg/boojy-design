@@ -27,10 +27,17 @@ EOF
 
     # Inject the payload right beneath the automated header marker to preserve manual notes
     if grep -q "### 🚨 Automated Engine Incident Logs" dreams.md; then
-        awk -v block="$incident_block" '
-            /### 🚨 Automated Engine Incident Logs/ { print; print block; next }
+        echo "$incident_block" > .incident_block.tmp
+        awk '
+            /### 🚨 Automated Engine Incident Logs/ {
+                print
+                while ((getline line < ".incident_block.tmp") > 0) print line
+                close(".incident_block.tmp")
+                next
+            }
             { print }
         ' dreams.md > .dreams.tmp && mv .dreams.tmp dreams.md
+        rm -f .incident_block.tmp
     else
         echo -e "\n### 🚨 Automated Engine Incident Logs\n$incident_block" >> dreams.md
     fi

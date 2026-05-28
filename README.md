@@ -23,9 +23,10 @@ collapsible right sidebar.
   free), single-axis edges, a rotate grip (15° snap), drag-inside to move; rotation-aware cursors and
   arrow-key nudges. Drag any handle **past the opposite edge to mirror** the layer; **Flip H / Flip V**
   buttons in the top bar mirror in place about the content centre. Pixels never leave their buffer.
-- **Layers** — add, reorder (drag), rename, duplicate (with pixels), delete, toggle visibility, with
-  a live thumbnail per layer. Every document opens with a locked white **Background** layer pinned
-  at the bottom (recolour it by filling it; it saves/exports like any layer).
+- **Layers** — add, reorder (drag), rename, duplicate (with pixels), delete, toggle visibility,
+  adjust **opacity** (0–100% slider in the sidebar, undoable), with a live thumbnail per layer.
+  Every document opens with a locked white **Background** layer pinned at the bottom (recolour it
+  by filling it; it saves/exports like any layer).
 - **Undo/redo** — one unified timeline across strokes *and* every layer op (incl. undo-delete with
   pixels intact): ⌘Z / ⌘⇧Z.
 - **Document** — import images (open or drag-drop), save/open `.design` files (⌘S / ⌘O), export

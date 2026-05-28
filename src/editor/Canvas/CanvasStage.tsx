@@ -1,4 +1,5 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react"
+import { createPortal } from "react-dom"
 import { CanvasEngine } from "@/editor/Canvas/engine/CanvasEngine"
 import { IDENTITY, type Transform } from "@/editor/Canvas/engine/transform"
 import { useThumbnailStore } from "@/editor/state/thumbnailStore"
@@ -90,6 +91,8 @@ export const CanvasStage = forwardRef<CanvasStageHandle, CanvasStageProps>(
     // Pan gesture (Space-drag or Hand tool): held button + last pointer position.
     const panningRef = useRef(false)
     const lastPanRef = useRef<{ x: number; y: number } | null>(null)
+    // Brush radius preview circle: pointer position relative to the canvas container.
+    const [pointerPos, setPointerPos] = useState<{ x: number; y: number } | null>(null)
     // Space held? Drives a temporary pan mode + grab cursor from any tool. `grabbing` is the
     // active-drag state (so the cursor is declarative — no imperative style fight).
     const [spaceDown, setSpaceDown] = useState(false)
@@ -352,7 +355,8 @@ export const CanvasStage = forwardRef<CanvasStageHandle, CanvasStageProps>(
       return () => window.removeEventListener("keydown", onArrow)
     }, [props.tool])
 
-    const isPaintTool = props.tool === "brush" || props.tool === "eraser" || props.tool === "shape"
+    const isBrushTool = props.tool === "brush" || props.tool === "eraser"
+    const isPaintTool = isBrushTool || props.tool === "shape"
     const showCrosshair =
       isPaintTool ||
       props.tool === "eyedropper" ||
@@ -370,9 +374,11 @@ export const CanvasStage = forwardRef<CanvasStageHandle, CanvasStageProps>(
         ? "grab"
         : engineDrivesCursor
           ? undefined
-          : showCrosshair
-            ? "crosshair"
-            : "default"
+          : isBrushTool
+            ? "none"
+            : showCrosshair
+              ? "crosshair"
+              : "default"
 
     return (
       <div
@@ -413,6 +419,7 @@ export const CanvasStage = forwardRef<CanvasStageHandle, CanvasStageProps>(
             engineRef.current?.beginStroke(e.clientX, e.clientY)
           }}
           onPointerMove={(e) => {
+            setPointerPos({ x: e.clientX, y: e.clientY })
             if (panningRef.current) {
               const last = lastPanRef.current
               if (last) {
@@ -465,6 +472,7 @@ export const CanvasStage = forwardRef<CanvasStageHandle, CanvasStageProps>(
             }
             engineRef.current?.endStroke()
           }}
+          onPointerLeave={() => setPointerPos(null)}
           onDragOver={(e) => e.preventDefault()}
           onDrop={(e) => {
             e.preventDefault()
@@ -472,6 +480,28 @@ export const CanvasStage = forwardRef<CanvasStageHandle, CanvasStageProps>(
             if (file?.type.startsWith("image/")) void importImage(file, file.name)
           }}
         />
+        {isBrushTool &&
+          !panMode &&
+          pointerPos &&
+          createPortal(
+            <div
+              aria-hidden="true"
+              style={{
+                position: "fixed",
+                left: pointerPos.x,
+                top: pointerPos.y,
+                width: Math.max(4, props.brushSize * (zoom / 100)),
+                height: Math.max(4, props.brushSize * (zoom / 100)),
+                transform: "translate(-50%, -50%)",
+                borderRadius: "50%",
+                border: "1px solid white",
+                boxShadow: "0 0 0 1px black",
+                pointerEvents: "none",
+                zIndex: 9999,
+              }}
+            />,
+            document.body,
+          )}
       </div>
     )
   },

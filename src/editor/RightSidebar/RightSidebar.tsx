@@ -14,6 +14,8 @@ interface RightSidebarProps {
   onRenameLayer: (id: string, name: string) => void
   onDuplicateLayer: (id: string) => void
   onMoveLayer: (id: string, toIndex: number) => void
+  onLiveLayerOpacity: (id: string, opacity: number) => void
+  onCommitLayerOpacity: (id: string, before: number, after: number) => void
 }
 
 /**
@@ -33,6 +35,8 @@ export function RightSidebar({
   onRenameLayer,
   onDuplicateLayer,
   onMoveLayer,
+  onLiveLayerOpacity,
+  onCommitLayerOpacity,
 }: RightSidebarProps) {
   return (
     <div
@@ -65,6 +69,8 @@ export function RightSidebar({
           onRename={onRenameLayer}
           onDuplicate={onDuplicateLayer}
           onMoveTo={onMoveLayer}
+          onLiveOpacity={onLiveLayerOpacity}
+          onCommitOpacity={onCommitLayerOpacity}
         />
       </div>
     </div>

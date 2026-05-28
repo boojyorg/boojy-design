@@ -13,8 +13,10 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable"
 import { Copy, Eye, EyeOff, GripVertical, Lock, Plus, Trash2 } from "lucide-react"
-import { type CSSProperties, useRef, useState } from "react"
+import { type CSSProperties, useEffect, useRef, useState } from "react"
+import { NumChip } from "@/components/NumChip"
 import { PanelHead } from "@/components/PanelHead"
+import { Slider } from "@/components/ui/slider"
 import { LayerThumb } from "@/editor/LayerThumb"
 import type { Layer } from "@/editor/types"
 import { cn } from "@/lib/cn"
@@ -29,6 +31,10 @@ interface LayersPanelProps {
   onRename: (id: string, name: string) => void
   onDuplicate: (id: string) => void
   onMoveTo: (id: string, toIndex: number) => void
+  /** Called on every drag tick — updates the engine live, no undo recorded. */
+  onLiveOpacity: (id: string, opacity: number) => void
+  /** Called once on pointer-up with before/after — records the undo step. */
+  onCommitOpacity: (id: string, before: number, after: number) => void
 }
 
 const footerBtn =
@@ -173,9 +179,17 @@ export function LayersPanel({
   onRename,
   onDuplicate,
   onMoveTo,
+  onLiveOpacity,
+  onCommitOpacity,
 }: LayersPanelProps) {
   const [editingId, setEditingId] = useState<string | null>(null)
   const cancelRef = useRef(false)
+  const activeLayer = layers.find((l) => l.id === activeLayerId)
+  const [localOpacity, setLocalOpacity] = useState(activeLayer?.opacity ?? 100)
+  const opacityBeforeDragRef = useRef(localOpacity)
+  useEffect(() => {
+    setLocalOpacity(activeLayer?.opacity ?? 100)
+  }, [activeLayer?.opacity])
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
@@ -206,6 +220,32 @@ export function LayersPanel({
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="shrink-0 px-[18px] pt-4 pb-2">
         <PanelHead>Layers</PanelHead>
+        {activeLayer && !activeLayer.background && (
+          <div
+            className="mt-3 flex items-center gap-2"
+            onPointerDown={() => {
+              opacityBeforeDragRef.current = localOpacity
+            }}
+          >
+            <span className="w-12 shrink-0 text-[12.5px] text-fg-dim">Opacity</span>
+            <Slider
+              aria-label="Layer opacity"
+              min={0}
+              max={100}
+              value={[localOpacity]}
+              onValueChange={([v]) => {
+                if (v !== undefined) {
+                  setLocalOpacity(v)
+                  onLiveOpacity(activeLayerId, v)
+                }
+              }}
+              onValueCommit={([v]) => {
+                if (v !== undefined) onCommitOpacity(activeLayerId, opacityBeforeDragRef.current, v)
+              }}
+            />
+            <NumChip value={localOpacity} />
+          </div>
+        )}
       </div>
 
       <DndContext sensors={sensors} onDragEnd={onDragEnd}>

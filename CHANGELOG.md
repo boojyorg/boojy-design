@@ -9,6 +9,16 @@ the `.design` file-format version is tracked separately in `src/lib/designFile.t
 
 _Nothing yet._
 
+## [0.3.0] — 2026-05-28
+
+### Added
+
+- **Layer opacity** — each layer now has a 0–100% opacity slider in the layers panel, shown
+  above the layer list whenever a non-Background layer is active. Opacity updates live as you
+  drag and is fully undoable as a single undo step (⌘Z jumps to the pre-drag value, not through
+  every intermediate position). Opacity is saved and restored in `.design` files and composited
+  correctly in exported PNGs.
+
 ## [0.2.1] — 2026-05-28
 
 ### Added
@@ -77,7 +87,8 @@ First tagged release: the V1 "Classic" shell plus a working MVP paint loop on th
   the Hand tool to pan, a Chrome-like preset zoom ladder on the +/- controls, and ⌘0 fit / ⌘1 100%.
 - **App version** — shown in the Design menu under "About Boojy Design".
 
-[Unreleased]: https://github.com/tyrbujac/boojy-design/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/tyrbujac/boojy-design/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/tyrbujac/boojy-design/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/tyrbujac/boojy-design/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/tyrbujac/boojy-design/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/tyrbujac/boojy-design/releases/tag/v0.1.0
