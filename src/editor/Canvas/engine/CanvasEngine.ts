@@ -413,11 +413,15 @@ export class CanvasEngine {
       return
     }
 
+    // Paint tools reach here only with a visible raster node (the `else` guard above) — narrow
+    // `target` from `RasterNode | undefined` to non-null so the buffer ops below are safe.
+    if (!target) return
+
     // Paint tools work in buffer-local space (the inverse of the layer's transform), so a stroke
     // lands under the cursor on a moved/scaled/rotated layer without changing the rest of the path.
     const local = invert(this.getLayerTransform(this.activeLayerId), point)
     this.snapshotCtx.clearRect(0, 0, DOC_WIDTH, DOC_HEIGHT)
-    this.snapshotCtx.drawImage(target!.canvas, 0, 0)
+    this.snapshotCtx.drawImage(target.canvas, 0, 0)
     this.strokeCtx.clearRect(0, 0, DOC_WIDTH, DOC_HEIGHT)
     this.carryOver = 0
     this.lastPoint = local
@@ -781,6 +785,10 @@ export class CanvasEngine {
       return
     }
 
+    // Paint path: the top guard only lets a non-select tool through with a non-null target —
+    // narrow it so the snapshot/commit below don't need a non-null assertion.
+    if (!target) return
+
     this.render() // bake the final state into the layer buffer
 
     // A shape click with no drag (zero width/height) paints nothing — skip the commit
@@ -800,7 +808,7 @@ export class CanvasEngine {
       this.onStrokeCommitted?.({
         layerId: this.strokeLayerId,
         before: this.cloneCanvas(this.snapshotCanvas),
-        after: this.cloneCanvas(target!.canvas),
+        after: this.cloneCanvas(target.canvas),
       })
       this.notifyPixels(this.strokeLayerId)
     }
