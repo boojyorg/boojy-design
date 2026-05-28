@@ -35,6 +35,12 @@ interface LayersPanelProps {
   onLiveOpacity: (id: string, opacity: number) => void
   /** Called once on pointer-up with before/after — records the undo step. */
   onCommitOpacity: (id: string, before: number, after: number) => void
+  /** Live font-size change for the active text layer. */
+  onLiveFontSize?: (id: string, size: number) => void
+  /** Display-only override during a scale drag — shows effective size without touching the store. */
+  liveLayerFontSize?: number
+  /** Text color change for the active text layer. */
+  onTextColor?: (id: string, color: string) => void
 }
 
 const footerBtn =
@@ -181,6 +187,9 @@ export function LayersPanel({
   onMoveTo,
   onLiveOpacity,
   onCommitOpacity,
+  onLiveFontSize,
+  liveLayerFontSize,
+  onTextColor,
 }: LayersPanelProps) {
   const [editingId, setEditingId] = useState<string | null>(null)
   const cancelRef = useRef(false)
@@ -245,6 +254,36 @@ export function LayersPanel({
             />
             <NumChip value={localOpacity} />
           </div>
+        )}
+        {activeLayer?.type === "text" && (
+          <>
+            <div className="mt-2 flex items-center gap-2">
+              <span className="w-12 shrink-0 text-[12.5px] text-fg-dim">Size</span>
+              <input
+                type="number"
+                aria-label="Font size"
+                min={6}
+                max={500}
+                step={1}
+                value={liveLayerFontSize ?? activeLayer.fontSize ?? 40}
+                onChange={(e) => {
+                  const v = Math.max(6, Math.min(500, Number(e.target.value)))
+                  onLiveFontSize?.(activeLayerId, v)
+                }}
+                className="w-16 rounded border border-divider bg-darkest px-1.5 py-0.5 text-[13px] text-fg outline-none focus:border-accent"
+              />
+            </div>
+            <div className="mt-2 flex items-center gap-2">
+              <span className="w-12 shrink-0 text-[12.5px] text-fg-dim">Color</span>
+              <input
+                type="color"
+                aria-label="Text color"
+                value={activeLayer.textColor ?? "#000000"}
+                onChange={(e) => onTextColor?.(activeLayerId, e.target.value)}
+                className="h-6 w-10 cursor-pointer rounded border border-divider bg-transparent p-0"
+              />
+            </div>
+          </>
         )}
       </div>
 

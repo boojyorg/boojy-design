@@ -36,6 +36,10 @@ export function EditorV1() {
   const renameLayer = useDocumentStore((s) => s.renameLayer)
   const moveLayer = useDocumentStore((s) => s.moveLayer)
   const setLayerOpacity = useDocumentStore((s) => s.setLayerOpacity)
+  const addTextLayer = useDocumentStore((s) => s.addTextLayer)
+  const setLayerText = useDocumentStore((s) => s.setLayerText)
+  const setLayerFontSize = useDocumentStore((s) => s.setLayerFontSize)
+  const setLayerTextColor = useDocumentStore((s) => s.setLayerTextColor)
   const canUndo = useUndoStore((s) => s.canUndo)
   const canRedo = useUndoStore((s) => s.canRedo)
   const record = useUndoStore((s) => s.record)
@@ -139,6 +143,66 @@ export function EditorV1() {
       record,
     )
   }, [pixelPort, record])
+
+  // Text layer creation + commit
+  const onTextLayerCreate = useCallback(
+    (id: string, _docX: number, _docY: number) => {
+      // Transform already pre-set in CanvasStage (engine.setLayerTransform) before this fires.
+      addTextLayer(id)
+    },
+    [addTextLayer],
+  )
+  const onTextCommit = useCallback(
+    (layerId: string, before: string, after: string) => {
+      setLayerText(layerId, after)
+      if (before !== after)
+        record({
+          label: "edit text",
+          undo: () => setLayerText(layerId, before),
+          redo: () => setLayerText(layerId, after),
+        })
+    },
+    [setLayerText, record],
+  )
+
+  // Display-only live font size during a text scale drag — not stored in the document store,
+  // so the store always holds the pre-drag original (needed for undo capture at commit time).
+  const [liveTextFontSize, setLiveTextFontSize] = useState<number | null>(null)
+
+  const onLiveTextScale = useCallback((_layerId: string, liveSize: number) => {
+    setLiveTextFontSize(liveSize)
+  }, [])
+
+  const onTextScaleCommit = useCallback(
+    (
+      layerId: string,
+      beforeTransform: typeof IDENTITY,
+      afterTransform: typeof IDENTITY,
+      bakedTransform: typeof IDENTITY,
+    ) => {
+      // Store was never updated live, so this is always the pre-drag original.
+      const originalFontSize =
+        useDocumentStore.getState().layers.find((l) => l.id === layerId)?.fontSize ?? 40
+      const newFontSize = Math.max(
+        1,
+        Math.round(originalFontSize * Math.abs(afterTransform.scaleY)),
+      )
+      setLiveTextFontSize(null)
+      setLayerFontSize(layerId, newFontSize)
+      record({
+        label: "resize text",
+        undo: () => {
+          setLayerFontSize(layerId, originalFontSize)
+          stageRef.current?.setLayerTransform(layerId, beforeTransform)
+        },
+        redo: () => {
+          setLayerFontSize(layerId, newFontSize)
+          stageRef.current?.setLayerTransform(layerId, bakedTransform)
+        },
+      })
+    },
+    [setLayerFontSize, record],
+  )
 
   // Marquee flip + float-drag
   const [hasMarqueeSelection, setHasMarqueeSelection] = useState(false)
@@ -257,6 +321,11 @@ export function EditorV1() {
             onRequestImageLayer={(name) => addLayer(name, "image")}
             onSampleColor={(hex) => dispatch({ type: "applySampledColor", color: hex })}
             onSelectLayer={(id) => selectLayer(id)}
+            onTextLayerCreate={onTextLayerCreate}
+            onTextCommit={onTextCommit}
+            onTextScaleCommit={onTextScaleCommit}
+            onLiveTextScale={onLiveTextScale}
+            onRequestTextTool={() => dispatch({ type: "setTool", tool: "text" })}
           />
           <RightSidebar
             collapsed={state.rightCollapsed}
@@ -282,6 +351,9 @@ export function EditorV1() {
                   redo: () => setLayerOpacity(id, after),
                 })
             }}
+            onLiveFontSize={(id, size) => setLayerFontSize(id, size)}
+            liveLayerFontSize={liveTextFontSize ?? undefined}
+            onTextColor={(id, color) => setLayerTextColor(id, color)}
           />
         </div>
       </div>

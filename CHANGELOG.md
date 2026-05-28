@@ -9,6 +9,20 @@ the `.design` file-format version is tracked separately in `src/lib/designFile.t
 
 _Nothing yet._
 
+## [0.4.0] — 2026-05-28
+
+### Added
+
+- **Live text layers** — pick the Text tool and click the canvas to place a text layer, then type
+  directly on the canvas; blurring or switching tools commits the edit. Click an existing text
+  layer with the Text tool (or double-click it from any tool) to re-edit, with the caret landing
+  at the clicked character. The layers panel gains font-size and text-colour controls when a text
+  layer is active. Text layers move, scale, and rotate with the Move tool like any other layer.
+  Text stays live (never rasterised) — it serialises as metadata in `.design` files (no pixels)
+  and composites into PNG export via `fillText`. Each commit is a single undo step.
+
+This release closes the MVP. Font-family picker, alignment, and multi-line wrapping are post-MVP.
+
 ## [0.3.0] — 2026-05-28
 
 ### Added

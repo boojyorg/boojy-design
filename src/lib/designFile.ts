@@ -21,13 +21,17 @@ interface SerializedLayer {
   kind?: VectorKind
   /** Marks the pinned document background layer. Optional → legacy files have none. */
   background?: boolean
-  /** data: URL PNG of the layer's pixels, or null if it had none (or couldn't be read). */
+  /** data: URL PNG of the layer's pixels, or null for text layers / no content. */
   pixels: string | null
   /** Non-destructive transform; omitted when identity. */
   transform?: Transform
   /** Legacy translate-only offset (pre-transform files) — read as `{…, scale:1, rotation:0}`. */
   offsetX?: number
   offsetY?: number
+  /** text layers only — persisted as metadata, no pixels field used. */
+  textContent?: string
+  fontSize?: number
+  textColor?: string
 }
 
 interface DesignFile {
@@ -77,7 +81,7 @@ export function serializeDesign(
 ): string {
   const layers: SerializedLayer[] = snapshot.layers.map((l) => {
     const t = getTransform(l.id)
-    return {
+    const base = {
       id: l.id,
       name: l.name,
       type: l.type,
@@ -86,8 +90,17 @@ export function serializeDesign(
       ...(l.kind ? { kind: l.kind } : {}),
       ...(l.background ? { background: true } : {}),
       ...(isIdentity(t) ? {} : { transform: t }),
-      pixels: getPixels(l.id)?.toDataURL("image/png") ?? null,
     }
+    if (l.type === "text") {
+      return {
+        ...base,
+        pixels: null,
+        ...(l.textContent !== undefined ? { textContent: l.textContent } : {}),
+        ...(l.fontSize !== undefined ? { fontSize: l.fontSize } : {}),
+        ...(l.textColor !== undefined ? { textColor: l.textColor } : {}),
+      }
+    }
+    return { ...base, pixels: getPixels(l.id)?.toDataURL("image/png") ?? null }
   })
   const file: DesignFile = {
     format: FORMAT,
@@ -114,6 +127,13 @@ export function parseDesign(json: string): ParsedDesign {
     opacity: l.opacity,
     ...(l.kind ? { kind: l.kind } : {}),
     ...(l.background ? { background: true } : {}),
+    ...(l.type === "text"
+      ? {
+          textContent: l.textContent ?? "",
+          fontSize: l.fontSize ?? 40,
+          textColor: l.textColor ?? "#000000",
+        }
+      : {}),
   }))
   const pixels = data.layers
     .filter((l): l is SerializedLayer & { pixels: string } => typeof l.pixels === "string")
@@ -174,7 +194,7 @@ function isSerializedLayer(v: unknown): v is SerializedLayer {
   return (
     typeof l.id === "string" &&
     typeof l.name === "string" &&
-    (l.type === "raster" || l.type === "vector" || l.type === "image") &&
+    (l.type === "raster" || l.type === "vector" || l.type === "image" || l.type === "text") &&
     typeof l.visible === "boolean" &&
     typeof l.opacity === "number" &&
     (l.pixels === null || typeof l.pixels === "string")

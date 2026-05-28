@@ -16,6 +16,10 @@ interface RightSidebarProps {
   onMoveLayer: (id: string, toIndex: number) => void
   onLiveLayerOpacity: (id: string, opacity: number) => void
   onCommitLayerOpacity: (id: string, before: number, after: number) => void
+  onLiveFontSize?: (id: string, size: number) => void
+  /** Live font size override during a scale drag — bypasses the document store for display only. */
+  liveLayerFontSize?: number
+  onTextColor?: (id: string, color: string) => void
 }
 
 /**
@@ -37,6 +41,9 @@ export function RightSidebar({
   onMoveLayer,
   onLiveLayerOpacity,
   onCommitLayerOpacity,
+  onLiveFontSize,
+  liveLayerFontSize,
+  onTextColor,
 }: RightSidebarProps) {
   return (
     <div
@@ -71,6 +78,9 @@ export function RightSidebar({
           onMoveTo={onMoveLayer}
           onLiveOpacity={onLiveLayerOpacity}
           onCommitOpacity={onCommitLayerOpacity}
+          onLiveFontSize={onLiveFontSize}
+          liveLayerFontSize={liveLayerFontSize}
+          onTextColor={onTextColor}
         />
       </div>
     </div>

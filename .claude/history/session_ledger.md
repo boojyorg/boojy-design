@@ -2,6 +2,112 @@
 
 ---
 
+## 2026-05-28 · text resize baking + stretch + live size · feat/layer-opacity
+
+### Session Work
+
+| Task | Outcome |
+|---|---|
+| Text scale baking | `onMoveCommitted` intercepts scale gestures on text layers; bakes `|scaleY|` into `fontSize`, resets `scaleY` to ±1; `scaleX` preserves stretch ratio |
+| Stretch support | Changed baked `scaleX` from `signX` → `after.scaleX / |after.scaleY|` so non-proportional horizontal resize survives |
+| Live size number | `onPointerMove` reads engine transform after `continueStroke`; fires `onLiveTextScale` → `liveLayerFontSize` state → `LayersPanel` display override; store untouched during drag |
+| Undo model | Single `⌘Z` step covers fontSize + transform together; original captured from store (never updated live) |
+
+### Token & Cost Telemetry
+
+| Metric | Value |
+|---|---|
+| Session cost (USD) | $20.35 |
+| API duration | 1h 14m 41s |
+| Wall duration | 2h 48m 53s |
+| Code changes | +1136 / −844 (cumulative session incl. prior uncommitted text-layer work) |
+| Haiku 4-5 input/output | 2.1k / 61 tokens — $0.0024 |
+| Sonnet 4-6 input/output | 5.7k / 196.9k tokens + 29.6M cache read / 1.2M cache write — $16.31 |
+| Opus 4-7 input/output | 25 / 13.9k tokens + 1.3M cache read / 489.8k cache write — $4.03 |
+| Context remaining | 4% used (resets 6:40pm Europe/London) |
+| Weekly (all models) | 38% used (resets May 31) |
+| Weekly (Sonnet only) | 10% used |
+| Top cost drivers | 74% subagent-heavy; 56% at >150k context (CanvasEngine.ts edits) |
+
+---
+
+## 2026-05-28 · text-layers chrome + Hybrid UX · main (unbranched)
+
+### Session Work
+
+| Task | Outcome |
+|---|---|
+| `tests/editor.test.tsx` | Replaced stale "Text is v0.5 placeholder" tests with "T activates Text" + "T shortcut" |
+| `CanvasStage.tsx` — textarea overlay | Transparent `<textarea>` + caretColor; T-cursor; blur / Escape / tool-switch commit |
+| `CanvasStage.tsx` — onPointerDown text branch | Rewrote: calls `hitTestTextLayer`; re-edits hit layer at caret; creates new layer on miss |
+| `CanvasStage.tsx` — onDoubleClick | Any-tool dbl-click opens edit + auto-switches to T via `onRequestTextTool` |
+| `EditorV1.tsx` | Wire `addTextLayer`, `setLayerText`, `setLayerFontSize`, `setLayerTextColor`, `onTextLayerCreate`, `onTextCommit`, `onRequestTextTool` |
+| `LayersPanel.tsx` | Font size number input + color picker below opacity slider when active layer is `"text"` |
+| `RightSidebar.tsx` / stories | Thread optional `onLiveFontSize?` + `onTextColor?`; add noop args to stories |
+| Fix: visual double-render | `color: "transparent"` on textarea; removed duplicate `caretColor` key |
+| Fix: Move tool on text | Loosened three `!target` guards in `beginStroke`/`continueStroke`/`endStroke` for select+textNode |
+| Fix: overlay handles missing | `renderOverlay` gate: added `textNodes.has(activeLayerId)` alongside `node?.image.visible()` |
+| Engine: `hitTestTextLayer` | Bounding-box hit-test across all visible text layers, top-to-bottom |
+| Engine: `measureTextCaretIndex` | Character-index lookup via `measureText` for caret placement on click |
+| `dreams.md` | Cleaned 280-line noise incident log; added Step 3 Hybrid UX checklist; updated cost note |
+
+### Code Velocity (branch vs. main)
+
+| Metric | Value |
+|---|---|
+| Files changed | 19 |
+| Insertions | +1,149 |
+| Deletions | −76 |
+
+### Token & Cost Telemetry
+
+| Metric | Value |
+|---|---|
+| Session cost (USD) | $15.30 |
+| API duration | 59m 8s |
+| Wall duration | 2h 16m 41s |
+| Haiku 4-5 | 1.0k / 30 tokens — $0.0012 |
+| Sonnet 4-6 | 5.7k / 150.9k tokens + 24.7M cache read / 799.5k cache write — $12.67 |
+| Opus 4-7 | 17 / 10.7k tokens + 850.4k cache read / 309.6k cache write — $2.63 |
+| Context remaining | 40% (resets 1:40pm Europe/London) |
+| Weekly (all models) | 37% used |
+| Weekly (Sonnet only) | 9% used |
+| Top cost driver | 62% at >150k context — long CanvasEngine.ts edit tail |
+
+### Pace note
+
+Plan-mode pauses worked well — two plan/approve cycles shaped the Hybrid UX decision before coding. Hook tax on `CanvasEngine.ts` (1400+ lines) is the main per-edit cost; smaller files were faster. Next session: branch, `pnpm dev` walkthrough, PR, tag v0.4.0.
+
+---
+
+## 2026-05-28 · text-layers engine foundation · (branch pending)
+
+### Session Work
+
+| Task | Outcome |
+|---|---|
+| `types.ts` | Added `"text"` to `LayerType`; `textContent`, `fontSize`, `textColor` optional fields on `Layer` |
+| `documentStore.ts` | `addTextLayer`, `setLayerText`, `setLayerFontSize`, `setLayerTextColor` actions |
+| `designFile.ts` | Text layer serialize/parse: `pixels: null` + metadata; `isSerializedLayer` accepts `"text"`; `parseDesign` restores text fields |
+| `tools.ts` | Text tool enabled (`mvp: true`); was v0.5 placeholder |
+| `CanvasEngine.ts` | `TextNode` interface + `textNodes` Map; `syncLayers` text branch (Konva.Text); transform integration; `applyTransformToTextNode`, `renderTextToCanvas` private methods; `pixelHitLayer` + `activeContentBox` + `nudgeActiveLayer` text branches; thumbnail generation; public: `setTextContent`, `screenToDocPoint`, `docToPagePos` |
+| **Pending** | `CanvasStage` text tool UI, `EditorV1` wiring, `LayersPanel` font/color controls, `pnpm dev` walkthrough, PR |
+
+### Code Velocity (branch vs. main)
+
+| Metric | Value |
+|---|---|
+| Files changed | 18 |
+| Insertions | +685 |
+| Deletions | −53 |
+| Net delta | +632 lines |
+
+### Pace note
+
+Hook tax on `CanvasEngine.ts` (1200+ lines): every edit triggered Biome reformat → typecheck → vitest, plus a mandatory re-read after reformat. ~3–4 round trips per logical change. Intermediate TS errors accumulated in `dreams.md` noise — cleaned at session end. Smaller files next.
+
+---
+
 ## 2026-05-28 · feat/flip-in-place-drag-mirror
 
 ### Code Velocity

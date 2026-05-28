@@ -126,14 +126,12 @@ describe("EditorV1 shell", () => {
     expect(screen.getByRole("button", { name: "Move (V)" })).toHaveAttribute("aria-pressed", "true")
   })
 
-  it("disables the non-MVP Text tool with a coming-in-v0.5 affordance", () => {
+  it("activates the Text tool on click", () => {
     renderEditor()
-    const text = screen.getByRole("button", { name: "Text — coming in v0.5" })
-    expect(text).toHaveAttribute("aria-disabled", "true")
-
-    // Clicking a disabled tool must not change the active tool (Brush props stay).
+    const text = screen.getByRole("button", { name: "Text (T)" })
+    expect(text).not.toHaveAttribute("aria-disabled", "true")
     fireEvent.click(text)
-    expect(within(screen.getByTestId("tool-props")).getByText("Color")).toBeInTheDocument()
+    expect(text).toHaveAttribute("aria-pressed", "true")
   })
 
   it("steps the zoom level with the +/- controls", () => {
@@ -266,11 +264,10 @@ describe("EditorV1 shell", () => {
     expect(sec().style.backgroundColor).toBe("rgb(255, 255, 255)")
   })
 
-  it("ignores shortcuts for the non-MVP Text tool (T does nothing)", () => {
+  it("activates Text tool via T shortcut", () => {
     renderEditor()
     fireEvent.keyDown(document.body, { key: "t" })
-    // Still Brush — Color prop remains.
-    expect(within(screen.getByTestId("tool-props")).getByText("Color")).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "Text (T)" })).toHaveAttribute("aria-pressed", "true")
   })
 
   it("zooms and nudges brush size via keyboard", () => {

@@ -30,6 +30,6 @@ export const TOOLS: ToolDef[] = [
   { id: "fill", label: "Fill", shortcut: "G", icon: PaintBucket, mvp: true },
   { id: "shape", label: "Shape", shortcut: "R", icon: Shapes, mvp: true },
   { id: "eyedropper", label: "Eyedropper", shortcut: "I", icon: Pipette, mvp: true },
-  { id: "text", label: "Text", shortcut: "T", icon: Type, mvp: false },
+  { id: "text", label: "Text", shortcut: "T", icon: Type, mvp: true },
   { id: "hand", label: "Hand", shortcut: "H", icon: Hand, mvp: true },
 ]
