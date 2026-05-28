@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is (read first)
 
-Boojy Design is a web image editor built on the V1 "Classic" shell (top bar, left tool rail, canvas, right sidebar). The app is tagged **v0.3.0** — see `CHANGELOG.md`. **v0.4.0 is the MVP cap** — one feature remains before MVP is declared complete: live text layers (see Roadmap).
+Boojy Design is a web image editor built on the V1 "Classic" shell (top bar, left tool rail, canvas, right sidebar). The app is tagged **v0.3.0** — see `CHANGELOG.md`. **v0.4.0 is the MVP cap** — live text layers are implemented and pending the `pnpm dev` walkthrough + PR merge to close MVP.
 
 Two things that still shape any change:
 
@@ -43,8 +43,8 @@ Two load-bearing rules:
 ## Architecture
 
 * **`src/editor/`** — shell split by region: `TopBar/`, `LeftRail/`, `Canvas/`, `RightSidebar/`. `EditorV1.tsx` is the composition root — owns the shell reducer, reads stores, wraps layer ops in undo commands, orchestrates save/open; regions are otherwise presentational.
-* **`src/lib/tools.ts`** — tool registry with `mvp` flag. The Text tool is dimmed until v0.3 ships it as a live-text layer; shortcuts only fire for active tools.
-* **`src/editor/types.ts`** — the layer model is intentionally thin. Transforms (`{x,y,scaleX,scaleY,rotation}`) live in the engine (`Map<layerId, Transform>` in `CanvasEngine`), not the model — "transforms are engine-phase." The one non-obvious metadata field is **`background?: boolean`** — the locked white Background layer pinned at the bottom, seeded white by the engine, guarded against delete/reorder/duplicate in `documentStore`.
+* **`src/lib/tools.ts`** — tool registry with `mvp` flag. All tools including Text are now MVP; shortcuts fire for all active tools.
+* **`src/editor/types.ts`** — the layer model is intentionally thin. Transforms (`{x,y,scaleX,scaleY,rotation}`) live in the engine (`Map<layerId, Transform>` in `CanvasEngine`), not the model — "transforms are engine-phase." Non-obvious metadata fields: **`background?: boolean`** — the locked white Background layer pinned at the bottom; **`textContent`, `fontSize`, `textColor`** — text-layer-only fields, serialized as metadata (no pixels). Text layers use a `Konva.Text` node in the engine and a `<textarea>` overlay in `CanvasStage` for live editing.
 * **Design tokens (Tailwind v4):** `src/theme/base.tokens.css` holds shared Boojy tokens; `src/theme/accent.design.css` holds the per-product accent (amber — swap to reskin). Components use utilities (`bg-chrome`, `text-fg-dim`, `bg-accent`), never inline hex.
 * **Components:** `src/components/ui/` are shadcn-style Radix wrappers; `src/components/` are app primitives.
 
@@ -82,11 +82,9 @@ Konva is the chosen engine — the brush hot path clears 60fps at 2K/50 layers o
 * **Persistence** — save/open `.design` (JSON + per-layer base64 PNG); Export PNG (flattened); Image import.
 * **Viewport navigation** — scroll-to-pan, pinch/⌘-scroll zoom-toward-cursor, Space-drag, Hand tool, preset zoom ladder, ⌘0 fit / ⌘1 100%.
 
-### v0.4.0 — MVP cap (current target)
+### v0.4.0 — MVP cap (pending walkthrough + PR)
 
-One feature ships in v0.4.0; once merged, MVP is complete.
-
-* **Live text layers** — a permanent new layer kind (never rasterized). Click canvas to place; type; blur/tool-switch commits. Double-click to re-edit. Text layer data (`content`, `fontFamily`, `fontSize`, `color`) lives in the layer model and serializes as metadata (no base64 PNG). The engine renders a `Konva.Text` node; in-canvas editing uses a positioned `<textarea>` overlay. Font family picker, alignment, and multi-line wrapping are **post-MVP**. Export (flatten PNG) composites text layers via `ctx.fillText`. Undo is coarse (whole content before/after commit).
+* **Live text layers** — implemented. Click canvas to place; type; blur/tool-switch commits. Click an existing text layer with the Text tool to re-edit. Font size + color controls in the layers panel. Konva.Text node in the engine; `<textarea>` overlay in CanvasStage. Text serializes as metadata in `.design` (no pixels). Export composites via `ctx.fillText`. Undo captures whole content before/after commit. Font family picker, alignment, multi-line wrapping are post-MVP.
 
 ### Post-MVP (deferred — don't start without a new milestone plan)
 

@@ -44,6 +44,23 @@ interface CanvasStageProps {
   onMarqueeSelectionChange?: (hasSelection: boolean) => void
   /** Float-drag ended: caller creates the permanent pasted layer and switches to Move. */
   onFloatEnd?: (clip: HTMLCanvasElement, transform: Transform) => void
+  /** Text tool placed a new layer — caller adds it to the document store. */
+  onTextLayerCreate?: (id: string, docX: number, docY: number) => void
+  /** Text editing committed (blur, Escape, or tool-switch) — caller records the undo step. */
+  onTextCommit?: (layerId: string, before: string, after: string) => void
+  /** Double-click-to-edit requests a tool switch to Text from any other tool. */
+  onRequestTextTool?: () => void
+  /** A resize gesture on a text layer was committed — baked transform already applied to the engine.
+   *  Caller updates fontSize and records the compound undo step. */
+  onTextScaleCommit?: (
+    layerId: string,
+    beforeTransform: Transform,
+    afterTransform: Transform,
+    bakedTransform: Transform,
+  ) => void
+  /** Fires on every pointer-move while a text layer is active under the select tool.
+   *  Reports the live effective font size (storedFontSize × |currentScaleY|) for panel display. */
+  onLiveTextScale?: (layerId: string, liveSize: number) => void
 }
 
 /** The narrow imperative surface the engine exposes across the seam. */
@@ -105,6 +122,28 @@ export const CanvasStage = forwardRef<CanvasStageHandle, CanvasStageProps>(
     // Latest onRequestImageLayer, read through a ref so the handle can stay stable.
     const onRequestImageLayerRef = useRef(props.onRequestImageLayer)
     onRequestImageLayerRef.current = props.onRequestImageLayer
+    // Text layer editing: null = not editing; before = snapshot for undo on commit.
+    const [textEditing, setTextEditing] = useState<{ layerId: string; before: string } | null>(null)
+    const [textValue, setTextValue] = useState("")
+    const textareaRef = useRef<HTMLTextAreaElement>(null)
+    // Stable refs so commitText + the tool-switch effect don't capture stale closures.
+    const textEditingRef = useRef(textEditing)
+    textEditingRef.current = textEditing
+    const textValueRef = useRef(textValue)
+    textValueRef.current = textValue
+    const onTextLayerCreateRef = useRef(props.onTextLayerCreate)
+    onTextLayerCreateRef.current = props.onTextLayerCreate
+    const onTextCommitRef = useRef(props.onTextCommit)
+    onTextCommitRef.current = props.onTextCommit
+    const onRequestTextToolRef = useRef(props.onRequestTextTool)
+    onRequestTextToolRef.current = props.onRequestTextTool
+    const onTextScaleCommitRef = useRef(props.onTextScaleCommit)
+    onTextScaleCommitRef.current = props.onTextScaleCommit
+    const onLiveTextScaleRef = useRef(props.onLiveTextScale)
+    onLiveTextScaleRef.current = props.onLiveTextScale
+    // Kept current so engine callbacks can safely read the latest layer list without deps churn.
+    const layersRef = useRef(props.layers)
+    layersRef.current = props.layers
 
     const importImage = useCallback(async (file: Blob, filename: string) => {
       const source = await decodeImageFile(file)
@@ -114,6 +153,16 @@ export const CanvasStage = forwardRef<CanvasStageHandle, CanvasStageProps>(
       // once syncLayers has created (and activated) the new layer's node.
       pendingImageRef.current = { source, w, h }
       onRequestImageLayerRef.current(toLayerName(filename))
+    }, [])
+
+    // Commit in-progress text editing: fire the callback and clear local state.
+    // Uses refs so it's stable and safe to call from blur / keydown / effects.
+    const commitText = useCallback(() => {
+      const editing = textEditingRef.current
+      if (!editing) return
+      onTextCommitRef.current?.(editing.layerId, editing.before, textValueRef.current)
+      setTextEditing(null)
+      setTextValue("")
     }, [])
 
     // Expose only these commands — the engine itself stays sealed inside this component.
@@ -173,8 +222,32 @@ export const CanvasStage = forwardRef<CanvasStageHandle, CanvasStageProps>(
           redo: () => engineRef.current?.restorePixels(commit.layerId, commit.after),
         })
       })
-      // A transform change (no pixels) — undo/redo just replays the before/after transform.
+      // A transform change (no pixels) — undo/redo replays before/after transform.
+      // Exception: when a text layer's scale magnitude changes, bake the scale into fontSize
+      // and reset scale to ±1 so the panel always shows the visual font size.
       engineRef.current?.setOnMoveCommitted((commit) => {
+        const layer = layersRef.current.find((l) => l.id === commit.layerId)
+        const scaleXChanged = Math.abs(commit.after.scaleX) !== Math.abs(commit.before.scaleX)
+        const scaleYChanged = Math.abs(commit.after.scaleY) !== Math.abs(commit.before.scaleY)
+        if (layer?.type === "text" && (scaleXChanged || scaleYChanged)) {
+          // Bake vertical scale into fontSize; keep horizontal ratio as residual scaleX so
+          // non-proportional stretches survive. scaleY resets to ±1 (direction preserved).
+          const scaleYMag = Math.abs(commit.after.scaleY)
+          const signY = Math.sign(commit.after.scaleY) || 1
+          const bakedTransform: Transform = {
+            ...commit.after,
+            scaleX: commit.after.scaleX / scaleYMag,
+            scaleY: signY,
+          }
+          engineRef.current?.setLayerTransform(commit.layerId, bakedTransform)
+          onTextScaleCommitRef.current?.(
+            commit.layerId,
+            commit.before,
+            commit.after,
+            bakedTransform,
+          )
+          return
+        }
         record({
           label: "transform",
           undo: () => engineRef.current?.setLayerTransform(commit.layerId, commit.before),
@@ -312,13 +385,32 @@ export const CanvasStage = forwardRef<CanvasStageHandle, CanvasStageProps>(
     }, [])
 
     // Marquee tool: Escape clears the active selection.
+    // Text tool: Escape commits the in-progress edit.
     useEffect(() => {
-      if (props.tool !== "marquee") return
-      const onKey = (e: KeyboardEvent) => {
-        if (e.key === "Escape") engineRef.current?.clearSelection()
+      if (props.tool === "marquee") {
+        const onKey = (e: KeyboardEvent) => {
+          if (e.key === "Escape") engineRef.current?.clearSelection()
+        }
+        window.addEventListener("keydown", onKey)
+        return () => window.removeEventListener("keydown", onKey)
       }
-      window.addEventListener("keydown", onKey)
-      return () => window.removeEventListener("keydown", onKey)
+      if (props.tool === "text") {
+        const onKey = (e: KeyboardEvent) => {
+          if (e.key === "Escape") commitText()
+        }
+        window.addEventListener("keydown", onKey)
+        return () => window.removeEventListener("keydown", onKey)
+      }
+    }, [props.tool, commitText])
+
+    // Switching away from the text tool commits any in-progress edit.
+    useEffect(() => {
+      if (props.tool === "text") return
+      const editing = textEditingRef.current
+      if (!editing) return
+      onTextCommitRef.current?.(editing.layerId, editing.before, textValueRef.current)
+      setTextEditing(null)
+      setTextValue("")
     }, [props.tool])
 
     // Move tool: arrow keys nudge the active layer (1px; 10px with Shift), each press a
@@ -376,9 +468,11 @@ export const CanvasStage = forwardRef<CanvasStageHandle, CanvasStageProps>(
           ? undefined
           : isBrushTool
             ? "none"
-            : showCrosshair
-              ? "crosshair"
-              : "default"
+            : props.tool === "text"
+              ? "text"
+              : showCrosshair
+                ? "crosshair"
+                : "default"
 
     return (
       <div
@@ -415,6 +509,44 @@ export const CanvasStage = forwardRef<CanvasStageHandle, CanvasStageProps>(
               engineRef.current?.beginSelection(e.clientX, e.clientY)
               return
             }
+            if (props.tool === "text") {
+              const engine = engineRef.current
+              if (!engine) return
+              const docPt = engine.screenToDocPoint(e.clientX, e.clientY)
+              if (!docPt) return
+              // Hit-test all text layers (not just the active one) — Photoshop behaviour:
+              // clicking any text with the T tool re-edits it at the caret position.
+              const hitId = engine.hitTestTextLayer(e.clientX, e.clientY)
+              if (hitId) {
+                const hitLayer = props.layers.find((l) => l.id === hitId)
+                const content = hitLayer?.textContent ?? ""
+                const caretIdx = engine.measureTextCaretIndex(hitId, e.clientX)
+                props.onSelectLayer(hitId)
+                setTextEditing({ layerId: hitId, before: content })
+                setTextValue(content)
+                setTimeout(() => {
+                  const ta = textareaRef.current
+                  if (!ta) return
+                  ta.focus()
+                  ta.setSelectionRange(caretIdx, caretIdx)
+                }, 0)
+              } else {
+                // No text layer hit — create a new one.
+                const id = crypto.randomUUID()
+                engine.setLayerTransform(id, {
+                  x: docPt.x,
+                  y: docPt.y,
+                  scaleX: 1,
+                  scaleY: 1,
+                  rotation: 0,
+                })
+                onTextLayerCreateRef.current?.(id, docPt.x, docPt.y)
+                setTextEditing({ layerId: id, before: "" })
+                setTextValue("")
+                setTimeout(() => textareaRef.current?.focus(), 0)
+              }
+              return
+            }
             e.currentTarget.setPointerCapture(e.pointerId)
             engineRef.current?.beginStroke(e.clientX, e.clientY)
           }}
@@ -434,8 +566,23 @@ export const CanvasStage = forwardRef<CanvasStageHandle, CanvasStageProps>(
               return
             }
             engineRef.current?.continueStroke(e.clientX, e.clientY, e.shiftKey)
-            // Move tool: update the handle-aware cursor on hover (no-ops mid-drag).
-            if (props.tool === "select") engineRef.current?.pointerHover(e.clientX, e.clientY)
+            if (props.tool === "select") {
+              // Update the handle-aware cursor on hover (no-ops mid-drag).
+              engineRef.current?.pointerHover(e.clientX, e.clientY)
+              // Live font-size readout: read the engine's current scaleY after continueStroke
+              // has applied the gesture. Fires on every move so the panel tracks the drag live.
+              const layer = layersRef.current.find((l) => l.id === props.activeLayerId)
+              if (layer?.type === "text") {
+                const t = engineRef.current?.getLayerTransform(props.activeLayerId)
+                if (t) {
+                  const liveSize = Math.max(
+                    1,
+                    Math.round((layer.fontSize ?? 40) * Math.abs(t.scaleY)),
+                  )
+                  onLiveTextScaleRef.current?.(props.activeLayerId, liveSize)
+                }
+              }
+            }
           }}
           onPointerUp={(e) => {
             if (panningRef.current) {
@@ -473,6 +620,27 @@ export const CanvasStage = forwardRef<CanvasStageHandle, CanvasStageProps>(
             engineRef.current?.endStroke()
           }}
           onPointerLeave={() => setPointerPos(null)}
+          onDoubleClick={(e) => {
+            const engine = engineRef.current
+            if (!engine) return
+            const hitId = engine.hitTestTextLayer(e.clientX, e.clientY)
+            if (!hitId) return
+            const hitLayer = props.layers.find((l) => l.id === hitId)
+            const content = hitLayer?.textContent ?? ""
+            const caretIdx = engine.measureTextCaretIndex(hitId, e.clientX)
+            props.onSelectLayer(hitId)
+            // If not already on the text tool, request the switch — the tool-switch effect
+            // fires on leaving text, not entering, so it won't immediately commit.
+            if (props.tool !== "text") onRequestTextToolRef.current?.()
+            setTextEditing({ layerId: hitId, before: content })
+            setTextValue(content)
+            setTimeout(() => {
+              const ta = textareaRef.current
+              if (!ta) return
+              ta.focus()
+              ta.setSelectionRange(caretIdx, caretIdx)
+            }, 0)
+          }}
           onDragOver={(e) => e.preventDefault()}
           onDrop={(e) => {
             e.preventDefault()
@@ -502,6 +670,56 @@ export const CanvasStage = forwardRef<CanvasStageHandle, CanvasStageProps>(
             />,
             document.body,
           )}
+        {textEditing &&
+          (() => {
+            const engine = engineRef.current
+            const layer = props.layers.find((l) => l.id === textEditing.layerId)
+            const fontSize = layer?.fontSize ?? 40
+            const color = layer?.textColor ?? "#000000"
+            const transform = engine?.getLayerTransform(textEditing.layerId)
+            const screenPos =
+              transform && engine ? engine.docToPagePos(transform.x, transform.y) : null
+            if (!screenPos) return null
+            return createPortal(
+              <textarea
+                ref={textareaRef}
+                value={textValue}
+                aria-label="Text layer content"
+                onChange={(e) => {
+                  const v = e.target.value
+                  setTextValue(v)
+                  engineRef.current?.setTextContent(textEditing.layerId, v)
+                }}
+                onBlur={commitText}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") {
+                    e.preventDefault()
+                    commitText()
+                  }
+                }}
+                style={{
+                  position: "fixed",
+                  left: screenPos.x,
+                  top: screenPos.y,
+                  minWidth: 4,
+                  minHeight: fontSize * (zoom / 100) * 1.3,
+                  font: `${fontSize * (zoom / 100)}px sans-serif`,
+                  color: "transparent",
+                  caretColor: color,
+                  background: "transparent",
+                  border: "none",
+                  outline: "none",
+                  resize: "none",
+                  overflow: "hidden",
+                  padding: 0,
+                  margin: 0,
+                  lineHeight: 1.3,
+                  zIndex: 9999,
+                }}
+              />,
+              document.body,
+            )
+          })()}
       </div>
     )
   },

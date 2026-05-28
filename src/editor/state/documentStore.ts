@@ -30,6 +30,12 @@ export interface DocumentState {
    *  caller-supplied id so the chrome can pre-stash pixels against it before the sync. */
   pasteLayer: (newId: string, name: string) => void
   setLayerOpacity: (id: string, opacity: number) => void
+  /** Insert a new live text layer. Caller supplies the id so the engine can pre-set the
+   *  transform (position) before the store update triggers syncLayers. */
+  addTextLayer: (id: string, name?: string) => void
+  setLayerText: (id: string, content: string) => void
+  setLayerFontSize: (id: string, size: number) => void
+  setLayerTextColor: (id: string, color: string) => void
 }
 
 /** The serialisable document slice — what persistence saves and what undo's mementos
@@ -134,5 +140,39 @@ export const useDocumentStore = create<DocumentState>()((set) => ({
   setLayerOpacity: (id, opacity) =>
     set((s) => ({
       layers: s.layers.map((l) => (l.id === id ? { ...l, opacity: Math.round(opacity) } : l)),
+    })),
+
+  addTextLayer: (id, name) =>
+    set((s) => {
+      const layer: Layer = {
+        id,
+        name: name ?? `Text ${s.nextLayerNum}`,
+        type: "text",
+        visible: true,
+        opacity: 100,
+        textContent: "",
+        fontSize: 40,
+        textColor: "#000000",
+      }
+      return {
+        layers: [layer, ...s.layers],
+        activeLayerId: layer.id,
+        nextLayerNum: s.nextLayerNum + 1,
+      }
+    }),
+
+  setLayerText: (id, content) =>
+    set((s) => ({
+      layers: s.layers.map((l) => (l.id === id ? { ...l, textContent: content } : l)),
+    })),
+
+  setLayerFontSize: (id, size) =>
+    set((s) => ({
+      layers: s.layers.map((l) => (l.id === id ? { ...l, fontSize: size } : l)),
+    })),
+
+  setLayerTextColor: (id, color) =>
+    set((s) => ({
+      layers: s.layers.map((l) => (l.id === id ? { ...l, textColor: color } : l)),
     })),
 }))

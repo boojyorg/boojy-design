@@ -9,7 +9,7 @@ export type ToolId =
   | "text"
   | "hand"
 
-export type LayerType = "raster" | "vector" | "image"
+export type LayerType = "raster" | "vector" | "image" | "text"
 export type VectorKind = "rect" | "ellipse"
 
 /**
@@ -29,4 +29,8 @@ export interface Layer {
   /** The document's pinned background layer: opaque paper at the bottom of the stack,
    *  locked from delete / reorder / duplicate. Just one per document. */
   background?: boolean
+  /** text layers only */
+  textContent?: string
+  fontSize?: number
+  textColor?: string
 }

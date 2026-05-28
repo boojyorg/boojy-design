@@ -48,6 +48,11 @@ interface RasterNode {
   image: Konva.Image
 }
 
+/** One text layer = a live Konva.Text node; content/style come from the Layer model. */
+interface TextNode {
+  text: Konva.Text
+}
+
 /** A committed stroke handed up to the unified timeline: the affected layer's full
  *  pixels before and after the stroke. The engine no longer owns undo ordering. */
 export interface StrokeCommit {
@@ -102,6 +107,7 @@ export class CanvasEngine {
   private container: HTMLDivElement | null = null
   private resizeObserver: ResizeObserver | null = null
   private readonly nodes = new Map<string, RasterNode>()
+  private readonly textNodes = new Map<string, TextNode>()
 
   private brush: BrushParams = DEFAULT_BRUSH
   private activeLayerId = ""
@@ -237,6 +243,7 @@ export class CanvasEngine {
     this.marqueeLines = []
     this.container = null
     this.nodes.clear()
+    this.textNodes.clear()
     this.strokeCanvas = null
     this.strokeCtx = null
     this.snapshotCanvas = null
@@ -271,6 +278,33 @@ export class CanvasEngine {
     const seen = new Set<string>()
     for (const layer of layers) {
       seen.add(layer.id)
+
+      if (layer.type === "text") {
+        let tn = this.textNodes.get(layer.id)
+        if (!tn) {
+          const konvaText = new Konva.Text({
+            text: layer.textContent ?? "",
+            fontSize: layer.fontSize ?? 40,
+            fill: layer.textColor ?? "#000000",
+            fontFamily: "sans-serif",
+            x: 0,
+            y: 0,
+            listening: false,
+          })
+          tn = { text: konvaText }
+          this.textNodes.set(layer.id, tn)
+          this.layer.add(konvaText)
+        } else {
+          tn.text.text(layer.textContent ?? "")
+          tn.text.fontSize(layer.fontSize ?? 40)
+          tn.text.fill(layer.textColor ?? "#000000")
+        }
+        tn.text.visible(layer.visible)
+        tn.text.opacity(layer.opacity / 100)
+        this.applyTransformToTextNode(tn.text, this.getLayerTransform(layer.id))
+        continue
+      }
+
       let node = this.nodes.get(layer.id)
       if (!node) {
         const created = this.createNode()
@@ -300,15 +334,19 @@ export class CanvasEngine {
       if (!seen.has(id)) {
         node.image.destroy()
         this.nodes.delete(id)
-        // No history pruning: the unified timeline is linear, so a deleted layer's
-        // older stroke commands can only be reached after its delete is undone — which
-        // resurrects the node first (delete-undo restores the layer + its pixels).
+      }
+    }
+    for (const [id, tn] of this.textNodes) {
+      if (!seen.has(id)) {
+        tn.text.destroy()
+        this.textNodes.delete(id)
       }
     }
 
     // Restack: bottom-of-stack (end of array) up to top-of-stack (index 0), page beneath.
     for (const layer of [...layers].reverse()) {
       this.nodes.get(layer.id)?.image.moveToTop()
+      this.textNodes.get(layer.id)?.text.moveToTop()
     }
     this.page?.moveToBottom()
     // The page rect is the structural white paper. Mirror the background layer's visibility
@@ -330,13 +368,19 @@ export class CanvasEngine {
       return
 
     const target = this.nodes.get(this.activeLayerId)
-    if (!target?.image.visible()) return
+    const isTextLayer = this.textNodes.has(this.activeLayerId)
+    // Select tool works on text layers (no raster node); paint tools need a visible raster node.
+    if (this.brush.tool === "select") {
+      if (!target?.image.visible() && !isTextLayer) return
+    } else {
+      if (!target?.image.visible()) return
+    }
     if (!this.ensureBuffers() || !this.strokeCtx || !this.snapshotCtx) return
 
     const point = this.screenToDoc(clientX, clientY)
     if (!point) return
 
-    this.target = target
+    this.target = target ?? null
     this.strokeLayerId = this.activeLayerId
 
     if (this.brush.tool === "select") {
@@ -373,7 +417,7 @@ export class CanvasEngine {
     // lands under the cursor on a moved/scaled/rotated layer without changing the rest of the path.
     const local = invert(this.getLayerTransform(this.activeLayerId), point)
     this.snapshotCtx.clearRect(0, 0, DOC_WIDTH, DOC_HEIGHT)
-    this.snapshotCtx.drawImage(target.canvas, 0, 0)
+    this.snapshotCtx.drawImage(target!.canvas, 0, 0)
     this.strokeCtx.clearRect(0, 0, DOC_WIDTH, DOC_HEIGHT)
     this.carryOver = 0
     this.lastPoint = local
@@ -390,7 +434,8 @@ export class CanvasEngine {
   }
 
   continueStroke(clientX: number, clientY: number, shiftKey = false) {
-    if (!this.target) return
+    if (!this.target && !(this.brush.tool === "select" && this.textNodes.has(this.strokeLayerId)))
+      return
     const point = this.screenToDoc(clientX, clientY)
     if (!point) return
 
@@ -480,12 +525,14 @@ export class CanvasEngine {
     return this.transforms.get(layerId) ?? IDENTITY
   }
 
-  /** Set a layer's transform: store it, apply it to the Konva image, refresh the overlay. Public so
+  /** Set a layer's transform: store it, apply it to the Konva node, refresh the overlay. Public so
    *  the timeline (transform undo/redo), duplicate and document-open can replay it. */
   setLayerTransform(layerId: string, transform: Transform) {
     this.transforms.set(layerId, transform)
     const node = this.nodes.get(layerId)
     if (node) this.applyTransformToNode(node, transform)
+    const tn = this.textNodes.get(layerId)
+    if (tn) this.applyTransformToTextNode(tn.text, transform)
     this.layer?.batchDraw()
     this.renderOverlay()
   }
@@ -500,7 +547,8 @@ export class CanvasEngine {
   nudgeActiveLayer(dx: number, dy: number) {
     if (!this.stage || (dx === 0 && dy === 0)) return
     const node = this.nodes.get(this.activeLayerId)
-    if (!node?.image.visible()) return
+    const tn = this.textNodes.get(this.activeLayerId)
+    if (!node?.image.visible() && !tn?.text.visible()) return
     const before = this.getLayerTransform(this.activeLayerId)
     const after = translateBy(before, dx, dy)
     this.setLayerTransform(this.activeLayerId, after)
@@ -710,7 +758,7 @@ export class CanvasEngine {
 
   endStroke() {
     const target = this.target
-    if (!target) return
+    if (!target && !(this.brush.tool === "select" && this.textNodes.has(this.strokeLayerId))) return
 
     if (this.brush.tool === "select") {
       // The image is already at its new transform. Commit only a real change; a click with no
@@ -752,7 +800,7 @@ export class CanvasEngine {
       this.onStrokeCommitted?.({
         layerId: this.strokeLayerId,
         before: this.cloneCanvas(this.snapshotCanvas),
-        after: this.cloneCanvas(target.canvas),
+        after: this.cloneCanvas(target!.canvas),
       })
       this.notifyPixels(this.strokeLayerId)
     }
@@ -840,11 +888,112 @@ export class CanvasEngine {
     return this.cloneCanvas(node.canvas)
   }
 
-  /** A PNG data URL preview for the Layers panel — the layer's **content** (its non-transparent
-   *  bounding box) scaled to fill the thumbnail, aspect-preserved. Null if the layer has no node,
-   *  no 2D context, or is blank (so a blank/erased layer shows an empty box). Ignores the layer's
-   *  move-offset — the preview is about *what's* on the layer, not where it sits on the page. */
+  /** Update a text layer's Konva.Text node content live (before the store is committed).
+   *  Call this on every keystroke; record undo separately on blur. */
+  setTextContent(layerId: string, content: string) {
+    const tn = this.textNodes.get(layerId)
+    if (!tn) return
+    tn.text.text(content)
+    this.layer?.batchDraw()
+    this.invalidateContentBox()
+    this.onLayerPixelsChanged?.(layerId)
+    if (layerId === this.activeLayerId) this.renderOverlay()
+  }
+
+  /** Map a screen (clientX, clientY) coordinate to document space. Public for CanvasStage. */
+  screenToDocPoint(clientX: number, clientY: number): { x: number; y: number } | null {
+    return this.screenToDoc(clientX, clientY)
+  }
+
+  /** Map a document-space point to page-absolute pixels (for `position:fixed` overlays). */
+  docToPagePos(docX: number, docY: number): { x: number; y: number } | null {
+    if (!this.container) return null
+    const rect = this.container.getBoundingClientRect()
+    const s = this.docToScreen({ x: docX, y: docY })
+    return { x: rect.left + s.x, y: rect.top + s.y }
+  }
+
+  /** Return the topmost visible text layer whose bounding box contains the given screen point,
+   *  or null. Used by CanvasStage for both T-tool single-click re-edit and dbl-click-to-edit. */
+  hitTestTextLayer(clientX: number, clientY: number): string | null {
+    const point = this.screenToDoc(clientX, clientY)
+    if (!point) return null
+    for (const layer of this.layers) {
+      if (!layer.visible) continue
+      const tn = this.textNodes.get(layer.id)
+      if (!tn) continue
+      const text = tn.text.text()
+      if (!text) continue
+      const local = invert(this.getLayerTransform(layer.id), point)
+      const fontSize = tn.text.fontSize()
+      let w = fontSize * text.length * 0.6
+      try {
+        const tmp = document.createElement("canvas").getContext("2d")
+        if (tmp) {
+          tmp.font = `${fontSize}px sans-serif`
+          w = tmp.measureText(text).width
+        }
+      } catch {
+        /* ignore */
+      }
+      if (local.x >= 0 && local.x <= w && local.y >= 0 && local.y <= fontSize * 1.3) return layer.id
+    }
+    return null
+  }
+
+  /** Given a screen X coordinate over a text layer, return the character index where the
+   *  caret should be placed (for positioning the textarea selection after re-edit). */
+  measureTextCaretIndex(layerId: string, clientX: number): number {
+    const tn = this.textNodes.get(layerId)
+    if (!tn) return 0
+    const text = tn.text.text()
+    if (!text) return 0
+    const t = this.getLayerTransform(layerId)
+    // localX: distance from the text origin in doc space (single-line, no rotation for now).
+    const docPt = this.screenToDoc(clientX, 0)
+    const localX = docPt ? docPt.x - t.x : 0
+    const fontSize = tn.text.fontSize()
+    try {
+      const tmp = document.createElement("canvas").getContext("2d")
+      if (!tmp) return 0
+      tmp.font = `${fontSize}px sans-serif`
+      let prev = 0
+      for (let i = 1; i <= text.length; i++) {
+        const w = tmp.measureText(text.slice(0, i)).width
+        if (localX < (prev + w) / 2) return i - 1
+        prev = w
+      }
+      return text.length
+    } catch {
+      return 0
+    }
+  }
+
+  /** A PNG data URL preview for the Layers panel. For text layers renders the text string; for
+   *  raster layers crops to the non-transparent bounding box. */
   getLayerThumbnail(layerId: string, w: number, h: number): string | null {
+    const tn = this.textNodes.get(layerId)
+    if (tn) {
+      const text = tn.text.text()
+      if (!text) return null
+      const thumb = document.createElement("canvas")
+      thumb.width = w
+      thumb.height = h
+      let ctx: CanvasRenderingContext2D | null = null
+      try {
+        ctx = thumb.getContext("2d")
+      } catch {
+        ctx = null
+      }
+      if (!ctx) return null
+      const fs = Math.min(tn.text.fontSize(), Math.round(h * 0.65))
+      ctx.font = `${fs}px sans-serif`
+      ctx.fillStyle = tn.text.fill() as string
+      ctx.textBaseline = "middle"
+      ctx.fillText(text.slice(0, 14), 4, h / 2)
+      return thumb.toDataURL("image/png")
+    }
+
     const node = this.nodes.get(layerId)
     if (!node) return null
     const bounds = contentBounds(
@@ -905,7 +1054,7 @@ export class CanvasEngine {
     flattenLayers(
       ctx,
       this.layers,
-      (id) => this.nodes.get(id)?.canvas,
+      (id) => this.nodes.get(id)?.canvas ?? this.renderTextToCanvas(id) ?? undefined,
       {
         background,
         backgroundColor: PAGE_BACKGROUND,
@@ -944,7 +1093,7 @@ export class CanvasEngine {
     flattenLayers(
       ctx,
       this.layers,
-      (id) => this.nodes.get(id)?.canvas,
+      (id) => this.nodes.get(id)?.canvas ?? this.renderTextToCanvas(id) ?? undefined,
       {
         background: "white",
         backgroundColor: PAGE_BACKGROUND,
@@ -1127,12 +1276,42 @@ export class CanvasEngine {
 
   // ── free-transform overlay + hit-testing ────────────────────────────────────
 
-  /** Apply a transform to a Konva.Image: position + uniform scale + rotation (radians→degrees),
-   *  pivoting about the buffer origin so it matches `apply()` in transform.ts. */
+  /** Apply a transform to a Konva.Image: position + scale + rotation (radians→degrees). */
   private applyTransformToNode(node: RasterNode, t: Transform) {
     node.image.position({ x: t.x, y: t.y })
     node.image.scale({ x: t.scaleX, y: t.scaleY })
     node.image.rotation((t.rotation * 180) / Math.PI)
+  }
+
+  /** Apply a transform to a Konva.Text node (same contract as raster). */
+  private applyTransformToTextNode(node: Konva.Text, t: Transform) {
+    node.position({ x: t.x, y: t.y })
+    node.scale({ x: t.scaleX, y: t.scaleY })
+    node.rotation((t.rotation * 180) / Math.PI)
+  }
+
+  /** Render a text layer's content to a full doc-space canvas at (0,0) so flattenLayers can
+   *  position it correctly via the stored transform. Returns null when no text node exists. */
+  private renderTextToCanvas(layerId: string): HTMLCanvasElement | null {
+    const tn = this.textNodes.get(layerId)
+    if (!tn) return null
+    const text = tn.text.text()
+    if (!text) return null
+    const canvas = document.createElement("canvas")
+    canvas.width = DOC_WIDTH
+    canvas.height = DOC_HEIGHT
+    let ctx: CanvasRenderingContext2D | null = null
+    try {
+      ctx = canvas.getContext("2d")
+    } catch {
+      ctx = null
+    }
+    if (!ctx) return null
+    ctx.font = `${tn.text.fontSize()}px sans-serif`
+    ctx.fillStyle = tn.text.fill() as string
+    ctx.textBaseline = "top"
+    ctx.fillText(text, 0, 0)
+    return canvas
   }
 
   /** The current view transform (doc→stage scale & offset). */
@@ -1155,10 +1334,35 @@ export class CanvasEngine {
     return { x: v.x + d.x * v.scale, y: v.y + d.y * v.scale }
   }
 
-  /** Content bounds of the active layer's buffer (cached — the scan is too costly per move). */
+  /** Content bounds of the active layer (cached). For text layers measures the rendered text;
+   *  for raster layers scans the pixel buffer. */
   private activeContentBox(): Bounds | null {
     const id = this.activeLayerId
     if (this.contentBoxCache?.layerId === id) return this.contentBoxCache.box
+
+    const tn = this.textNodes.get(id)
+    if (tn) {
+      const text = tn.text.text()
+      if (!text) {
+        this.contentBoxCache = { layerId: id, box: null }
+        return null
+      }
+      const fontSize = tn.text.fontSize()
+      let textWidth = fontSize * text.length * 0.6
+      try {
+        const tmp = document.createElement("canvas").getContext("2d")
+        if (tmp) {
+          tmp.font = `${fontSize}px sans-serif`
+          textWidth = tmp.measureText(text).width
+        }
+      } catch {
+        /* ignore */
+      }
+      const box: Bounds = { x: 0, y: 0, w: textWidth, h: fontSize * 1.3 }
+      this.contentBoxCache = { layerId: id, box }
+      return box
+    }
+
     const node = this.nodes.get(id)
     const box = node
       ? contentBounds(
@@ -1201,6 +1405,21 @@ export class CanvasEngine {
     for (let i = from; i < to; i++) {
       const layer = this.layers[i]
       if (!layer?.visible) continue
+
+      // Text layer: hit-test against the approximate rendered bounding box.
+      const tn = this.textNodes.get(layer.id)
+      if (tn) {
+        const text = tn.text.text()
+        if (!text) continue
+        const local = invert(this.getLayerTransform(layer.id), point)
+        const fontSize = tn.text.fontSize()
+        const approxW = fontSize * text.length * 0.6
+        const approxH = fontSize * 1.3
+        if (local.x >= 0 && local.x <= approxW && local.y >= 0 && local.y <= approxH)
+          return layer.id
+        continue
+      }
+
       const node = this.nodes.get(layer.id)
       if (!node) continue
       const local = invert(this.getLayerTransform(layer.id), point)
@@ -1276,8 +1495,8 @@ export class CanvasEngine {
     if (!ov) return
     ov.destroyChildren()
     const node = this.nodes.get(this.activeLayerId)
-    const box =
-      this.brush.tool === "select" && node?.image.visible() ? this.activeContentBox() : null
+    const hasActiveNode = node?.image.visible() || this.textNodes.has(this.activeLayerId)
+    const box = this.brush.tool === "select" && hasActiveNode ? this.activeContentBox() : null
     if (!box) {
       ov.batchDraw()
       return
