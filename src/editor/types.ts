@@ -34,3 +34,7 @@ export interface Layer {
   fontSize?: number
   textColor?: string
 }
+
+/** Default fill for a new (or legacy/undefined) text layer. Single source for the layer
+ *  model, the store, persistence, the engine's Konva.Text node and the colour picker. */
+export const DEFAULT_TEXT_COLOR = "#000000"

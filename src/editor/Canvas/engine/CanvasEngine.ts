@@ -37,7 +37,7 @@ import {
   type Point,
 } from "@/editor/Canvas/engine/types"
 import { computeView } from "@/editor/Canvas/engine/viewport"
-import type { Layer } from "@/editor/types"
+import { DEFAULT_TEXT_COLOR, type Layer } from "@/editor/types"
 import { downloadBlob } from "@/lib/download"
 import { toExportFilename } from "@/lib/filename"
 
@@ -285,7 +285,7 @@ export class CanvasEngine {
           const konvaText = new Konva.Text({
             text: layer.textContent ?? "",
             fontSize: layer.fontSize ?? 40,
-            fill: layer.textColor ?? "#000000",
+            fill: layer.textColor ?? DEFAULT_TEXT_COLOR,
             fontFamily: "sans-serif",
             x: 0,
             y: 0,
@@ -297,7 +297,7 @@ export class CanvasEngine {
         } else {
           tn.text.text(layer.textContent ?? "")
           tn.text.fontSize(layer.fontSize ?? 40)
-          tn.text.fill(layer.textColor ?? "#000000")
+          tn.text.fill(layer.textColor ?? DEFAULT_TEXT_COLOR)
         }
         tn.text.visible(layer.visible)
         tn.text.opacity(layer.opacity / 100)
