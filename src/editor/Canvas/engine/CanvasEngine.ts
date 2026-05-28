@@ -981,32 +981,9 @@ export class CanvasEngine {
    * stack order. `background: "white"` fills the page first; "transparent" leaves alpha.
    */
   exportPNG(opts?: { background?: "white" | "transparent" }) {
-    const background = opts?.background ?? "white"
-    const out = document.createElement("canvas")
-    out.width = DOC_WIDTH
-    out.height = DOC_HEIGHT
-    let ctx: CanvasRenderingContext2D | null = null
-    try {
-      ctx = out.getContext("2d")
-    } catch {
-      ctx = null
-    }
-    if (!ctx) return
-
-    flattenLayers(
-      ctx,
-      this.layers,
-      (id) => this.nodes.get(id)?.canvas ?? this.renderTextToCanvas(id) ?? undefined,
-      {
-        background,
-        backgroundColor: PAGE_BACKGROUND,
-        width: DOC_WIDTH,
-        height: DOC_HEIGHT,
-      },
-      (id) => this.getLayerTransform(id),
-    )
-
-    out.toBlob((blob) => {
+    const composite = this.compositeToCanvas(opts?.background ?? "white")
+    if (!composite) return
+    composite.canvas.toBlob((blob) => {
       if (blob) downloadBlob(blob, toExportFilename("Untitled"))
     }, "image/png")
   }
@@ -1021,32 +998,28 @@ export class CanvasEngine {
     const y = Math.floor(point.y)
     if (x < 0 || y < 0 || x >= DOC_WIDTH || y >= DOC_HEIGHT) return null
 
-    const out = document.createElement("canvas")
-    out.width = DOC_WIDTH
-    out.height = DOC_HEIGHT
-    let ctx: CanvasRenderingContext2D | null = null
-    try {
-      ctx = out.getContext("2d")
-    } catch {
-      ctx = null
-    }
-    if (!ctx) return null
+    const composite = this.compositeToCanvas("white")
+    if (!composite) return null
+    const d = composite.ctx.getImageData(x, y, 1, 1).data
+    return rgbaToHex(d[0] ?? 0, d[1] ?? 0, d[2] ?? 0)
+  }
 
+  /** Flatten the whole layer stack onto a fresh DOC-sized canvas (white or transparent page).
+   *  Shared by exportPNG (→ PNG blob) and sampleColorAt (→ pixel read); identical to the export
+   *  composite so "what you click is what you get". Null under jsdom (no canvas backend). */
+  private compositeToCanvas(
+    background: "white" | "transparent",
+  ): { canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D } | null {
+    const out = this.makeCanvas(DOC_WIDTH, DOC_HEIGHT)
+    if (!out) return null
     flattenLayers(
-      ctx,
+      out.ctx,
       this.layers,
       (id) => this.nodes.get(id)?.canvas ?? this.renderTextToCanvas(id) ?? undefined,
-      {
-        background: "white",
-        backgroundColor: PAGE_BACKGROUND,
-        width: DOC_WIDTH,
-        height: DOC_HEIGHT,
-      },
+      { background, backgroundColor: PAGE_BACKGROUND, width: DOC_WIDTH, height: DOC_HEIGHT },
       (id) => this.getLayerTransform(id),
     )
-
-    const d = ctx.getImageData(x, y, 1, 1).data
-    return rgbaToHex(d[0] ?? 0, d[1] ?? 0, d[2] ?? 0)
+    return out
   }
 
   /** Flood-fill the active layer from a screen point with the foreground colour. Contiguous,
