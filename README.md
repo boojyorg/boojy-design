@@ -6,6 +6,9 @@
 A web image editor built on the **V1 "Classic"** layout: top bar, left tool rail, canvas, and a
 collapsible right sidebar.
 
+> 📖 New here? **[FEATURES.md](./FEATURES.md)** is a plain-language tour of what the app can do
+> (with ASCII mockups of the UI) — read that to get a feel for Boojy Design without running it.
+
 > **Status: active side-project (v0.4.0 — MVP complete).** The UI shell is live and the design
 > direction is confirmed. The Konva canvas engine has landed and the full MVP loop works — paint,
 > shapes, fill, layers (with opacity), transform, selection, live text, undo/redo, import/export,
