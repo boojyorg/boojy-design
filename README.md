@@ -1,15 +1,15 @@
 # Boojy Design — web image editor
 
 [![CI](https://github.com/tyrbujac/boojy-design/actions/workflows/ci.yml/badge.svg)](https://github.com/tyrbujac/boojy-design/actions/workflows/ci.yml)
-[![version](https://img.shields.io/badge/version-0.2.1-E89940)](./CHANGELOG.md)
+[![version](https://img.shields.io/badge/version-0.4.0-E89940)](./CHANGELOG.md)
 
 A web image editor built on the **V1 "Classic"** layout: top bar, left tool rail, canvas, and a
 collapsible right sidebar.
 
-> **Status: active side-project (v0.2.1).** The UI shell is live and the design direction is
-> confirmed. The Konva canvas engine has landed and the MVP paint loop works — paint, shapes, fill,
-> layers, transform, selection, undo/redo, import/export, and `.design` save/open — all behind a
-> clean seam (`CanvasStage` → `Canvas/engine/`).
+> **Status: active side-project (v0.4.0 — MVP complete).** The UI shell is live and the design
+> direction is confirmed. The Konva canvas engine has landed and the full MVP loop works — paint,
+> shapes, fill, layers (with opacity), transform, selection, live text, undo/redo, import/export,
+> and `.design` save/open — all behind a clean seam (`CanvasStage` → `Canvas/engine/`).
 
 ## Features
 
@@ -19,6 +19,10 @@ collapsible right sidebar.
 - **Colours** — foreground + secondary swatches in the rail; **X** swaps them, **D** resets to
   black/white. (Painting always uses the foreground; the secondary is a colour-memory slot.)
 - **Shapes** — drag a filled rectangle or ellipse onto the active layer (Shift → square/circle).
+- **Text** — click the canvas with the Text tool to place a live text layer; type and blur (or
+  switch tools) to commit. Click an existing text layer with the Text tool to re-edit, or
+  double-click it from any tool. Font size + colour controls in the layers panel; text stays
+  live (never rasterised), saves in `.design` as metadata, and composites into PNG export.
 - **Move / transform** — a non-destructive 8-handle free transform: proportional corners (Shift =
   free), single-axis edges, a rotate grip (15° snap), drag-inside to move; rotation-aware cursors and
   arrow-key nudges. Drag any handle **past the opposite edge to mirror** the layer; **Flip H / Flip V**
@@ -88,7 +92,8 @@ tests) · Storybook · Biome · pnpm.
 
 ## What's next
 
-- **Text tool** — present in the rail, dimmed (`coming in v0.5`).
+- **Text formatting** — font-family picker, alignment, and multi-line wrapping (the MVP ships
+  single-font, single-block live text).
 - **Blend modes** (per-layer).
 - **Marquee: paint masking** — constrain brush/fill/eraser to the selected region (deferred from v0.2).
 - Later: lasso selection, gradients, and tiling for larger documents.

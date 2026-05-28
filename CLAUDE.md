@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is (read first)
 
-Boojy Design is a web image editor built on the V1 "Classic" shell (top bar, left tool rail, canvas, right sidebar). The app is tagged **v0.3.0** — see `CHANGELOG.md`. **v0.4.0 is the MVP cap** — live text layers are implemented and pending the `pnpm dev` walkthrough + PR merge to close MVP.
+Boojy Design is a web image editor built on the V1 "Classic" shell (top bar, left tool rail, canvas, right sidebar). The app is tagged **v0.4.0** — see `CHANGELOG.md`. **v0.4.0 is the MVP cap and MVP is now complete** — live text layers shipped (walkthrough passed, merged). Post-MVP items (see Roadmap) need a fresh milestone plan before starting.
 
 Two things that still shape any change:
 
@@ -55,7 +55,6 @@ Two load-bearing rules:
 * **Radix needs polyfills under jsdom.** `vitest.setup.ts` stubs `ResizeObserver` and pointer-capture APIs.
 * **Tests target accessible queries** (roles, `aria-label`, `data-testid`). Prefer those over brittle DOM-shape assertions.
 * **Two Vitest projects** (`vite.config.ts`): `dom` (jsdom, engine no-ops via `getContext` stub) and `node` (`tests/pixel/`, real `@napi-rs/canvas`). To pixel-test engine drawing, extract the algorithm into a pure **ctx-taking** function (see `flatten.ts`, `selection.ts`) and assert `getImageData`. Cast `@napi-rs` contexts to the DOM type in tests. When a helper needs to allocate a canvas (like `copyRegion`), take the output canvas as a **caller-supplied parameter** so node tests can pass `createCanvas` instead of `document.createElement`.
-* **Multi-Model Tiering:** Default to **Sonnet 4-6** for standard work; **Haiku 4-5** for filesystem sweeps and minor edits; **Opus 4-7** only for heavy architectural pivots or complex rendering logic.
 * **Automated Validation Hooks:** `.claude/settings.json` wires a `PostToolUse` hook (`.claude/hooks/post-edit-validation.sh`) that runs Biome auto-fix → `typecheck` → `vitest related` after every `.ts`/`.tsx` edit. Do not bypass it.
 * **Keep the docs current.** Architecture or roadmap changes update `README.md` and `CLAUDE.md` in the same commit. A shippable release bumps `version` in `package.json` and adds a `CHANGELOG.md` entry.
 * **App version** is `__APP_VERSION__` (Vite `define` from `package.json`) — distinct from the `.design` file-format version in `designFile.ts`.
@@ -82,9 +81,9 @@ Konva is the chosen engine — the brush hot path clears 60fps at 2K/50 layers o
 * **Persistence** — save/open `.design` (JSON + per-layer base64 PNG); Export PNG (flattened); Image import.
 * **Viewport navigation** — scroll-to-pan, pinch/⌘-scroll zoom-toward-cursor, Space-drag, Hand tool, preset zoom ladder, ⌘0 fit / ⌘1 100%.
 
-### v0.4.0 — MVP cap (pending walkthrough + PR)
+### v0.4.0 — MVP cap (shipped — MVP complete)
 
-* **Live text layers** — implemented. Click canvas to place; type; blur/tool-switch commits. Click an existing text layer with the Text tool to re-edit. Font size + color controls in the layers panel. Konva.Text node in the engine; `<textarea>` overlay in CanvasStage. Text serializes as metadata in `.design` (no pixels). Export composites via `ctx.fillText`. Undo captures whole content before/after commit. Font family picker, alignment, multi-line wrapping are post-MVP.
+* **Live text layers** — shipped. Click canvas to place; type; blur/tool-switch commits. Click an existing text layer with the Text tool to re-edit. Font size + color controls in the layers panel. Konva.Text node in the engine; `<textarea>` overlay in CanvasStage. Text serializes as metadata in `.design` (no pixels). Export composites via `ctx.fillText`. Undo captures whole content before/after commit. Font family picker, alignment, multi-line wrapping are post-MVP.
 
 ### Post-MVP (deferred — don't start without a new milestone plan)
 

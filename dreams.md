@@ -32,7 +32,7 @@
 - [x] Engine: `hitTestTextLayer(clientX, clientY)` — bounding-box hit-test across all visible text layers (top-to-bottom); `measureTextCaretIndex(layerId, clientX)` — character-index lookup via `measureText`
 - [x] T + click on existing text: rewrote `onPointerDown` to call `hitTestTextLayer` first; re-edits the hit layer with caret at clicked character (Photoshop model)
 - [x] Dbl-click from any tool: `onDoubleClick` handler calls `hitTestTextLayer`; if hit, opens edit + auto-switches to T via `onRequestTextTool`
-- [ ] `pnpm dev` walkthrough: place text, re-edit with T, move + resize with V, dbl-click from V, undo/redo, save + reopen
+- [x] `pnpm dev` walkthrough: place text, re-edit with T, move + resize with V, dbl-click from V, undo/redo, save + reopen ✅
 
 ---
 
