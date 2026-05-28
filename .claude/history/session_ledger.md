@@ -2,6 +2,35 @@
 
 ---
 
+## 2026-05-28 · text resize baking + stretch + live size · feat/layer-opacity
+
+### Session Work
+
+| Task | Outcome |
+|---|---|
+| Text scale baking | `onMoveCommitted` intercepts scale gestures on text layers; bakes `|scaleY|` into `fontSize`, resets `scaleY` to ±1; `scaleX` preserves stretch ratio |
+| Stretch support | Changed baked `scaleX` from `signX` → `after.scaleX / |after.scaleY|` so non-proportional horizontal resize survives |
+| Live size number | `onPointerMove` reads engine transform after `continueStroke`; fires `onLiveTextScale` → `liveLayerFontSize` state → `LayersPanel` display override; store untouched during drag |
+| Undo model | Single `⌘Z` step covers fontSize + transform together; original captured from store (never updated live) |
+
+### Token & Cost Telemetry
+
+| Metric | Value |
+|---|---|
+| Session cost (USD) | $20.35 |
+| API duration | 1h 14m 41s |
+| Wall duration | 2h 48m 53s |
+| Code changes | +1136 / −844 (cumulative session incl. prior uncommitted text-layer work) |
+| Haiku 4-5 input/output | 2.1k / 61 tokens — $0.0024 |
+| Sonnet 4-6 input/output | 5.7k / 196.9k tokens + 29.6M cache read / 1.2M cache write — $16.31 |
+| Opus 4-7 input/output | 25 / 13.9k tokens + 1.3M cache read / 489.8k cache write — $4.03 |
+| Context remaining | 4% used (resets 6:40pm Europe/London) |
+| Weekly (all models) | 38% used (resets May 31) |
+| Weekly (Sonnet only) | 10% used |
+| Top cost drivers | 74% subagent-heavy; 56% at >150k context (CanvasEngine.ts edits) |
+
+---
+
 ## 2026-05-28 · text-layers chrome + Hybrid UX · main (unbranched)
 
 ### Session Work
