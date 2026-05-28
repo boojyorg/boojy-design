@@ -1,18 +1,12 @@
 import Konva from "konva"
-import {
-  compositeOp,
-  hardnessStops,
-  interpolateStamps,
-  snapTo45,
-  stampSpacing,
-  strokeAlpha,
-} from "@/editor/Canvas/engine/brush"
+import { interpolateStamps, snapTo45, stampSpacing } from "@/editor/Canvas/engine/brush"
 import { hexToRgb, rgbaToHex } from "@/editor/Canvas/engine/color"
 import { drawImageContain } from "@/editor/Canvas/engine/draw"
 import { floodFill } from "@/editor/Canvas/engine/fill"
 import { flattenLayers } from "@/editor/Canvas/engine/flatten"
 import { clearRegion, copyRegion, flipRegion } from "@/editor/Canvas/engine/selection"
 import { drawEllipse, drawRect, normalizeRect } from "@/editor/Canvas/engine/shape"
+import { compositeStroke, stampInto } from "@/editor/Canvas/engine/stroke"
 import { caretIndexAt, drawText, textContentBox } from "@/editor/Canvas/engine/text"
 import { type Bounds, contentBounds } from "@/editor/Canvas/engine/thumbnail"
 import {
@@ -1195,17 +1189,8 @@ export class CanvasEngine {
 
   /** Paint one stamp into the stroke buffer at full alpha (centre→edge gradient). */
   private stampAt(point: Point) {
-    const ctx = this.strokeCtx
-    if (!ctx) return
-    const radius = Math.max(0.5, this.brush.size / 2)
-    const grad = ctx.createRadialGradient(point.x, point.y, 0, point.x, point.y, radius)
-    for (const stop of hardnessStops(this.brush.hardness)) {
-      grad.addColorStop(stop.offset, hexToRgba(this.brush.color, stop.alpha))
-    }
-    ctx.fillStyle = grad
-    ctx.beginPath()
-    ctx.arc(point.x, point.y, radius, 0, Math.PI * 2)
-    ctx.fill()
+    if (!this.strokeCtx) return
+    stampInto(this.strokeCtx, point, this.brush)
   }
 
   /** Redraw the target buffer = snapshot + (stroke composited once at stroke opacity). */
@@ -1213,19 +1198,7 @@ export class CanvasEngine {
     const target = this.target
     if (!target || !this.snapshotCanvas || !this.strokeCanvas) return
     const tool = this.brush.tool === "eraser" ? "eraser" : "brush"
-    const ctx = target.ctx
-
-    ctx.clearRect(0, 0, DOC_WIDTH, DOC_HEIGHT)
-    ctx.globalAlpha = 1
-    ctx.globalCompositeOperation = "source-over"
-    ctx.drawImage(this.snapshotCanvas, 0, 0)
-
-    ctx.globalAlpha = strokeAlpha(this.brush.opacity)
-    ctx.globalCompositeOperation = compositeOp(tool)
-    ctx.drawImage(this.strokeCanvas, 0, 0)
-
-    ctx.globalAlpha = 1
-    ctx.globalCompositeOperation = "source-over"
+    compositeStroke(target.ctx, this.snapshotCanvas, this.strokeCanvas, this.brush.opacity, tool)
     this.layer?.batchDraw()
   }
 
@@ -1595,14 +1568,4 @@ export class CanvasEngine {
       this.marqueeAnimFrame = null
     }
   }
-}
-
-/** Expand a `#rrggbb` (or `#rgb`) hex to an `rgba()` string at the given alpha. */
-function hexToRgba(hex: string, alpha: number): string {
-  const h = hex.replace("#", "")
-  const full = h.length === 3 ? `${h[0]}${h[0]}${h[1]}${h[1]}${h[2]}${h[2]}` : h
-  const r = Number.parseInt(full.slice(0, 2), 16)
-  const g = Number.parseInt(full.slice(2, 4), 16)
-  const b = Number.parseInt(full.slice(4, 6), 16)
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`
 }

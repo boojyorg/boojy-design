@@ -64,6 +64,47 @@
 - [ ] **UI Bug:** Add manual observations from `pnpm dev` walkthroughs here.
 
 ### 🚨 Automated Engine Incident Logs (Script Prepended)
+- [ ] **Fix TypeScript Typecheck Failure in `/Users/tyrbujac/Documents/Projects/boojy/boojy-design/tests/pixel/color.test.ts`**
+  ```text
+  
+> boojy-design@0.4.0 typecheck /Users/tyrbujac/Documents/Projects/boojy/boojy-design
+> tsc -b --noEmit
+
+tests/pixel/color.test.ts(3,10): error TS6133: 'hexToRgba' is declared but its value is never read.
+ ELIFECYCLE  Command failed with exit code 2.
+  ```
+- [ ] **Fix TypeScript Typecheck Failure in `/Users/tyrbujac/Documents/Projects/boojy/boojy-design/src/editor/Canvas/engine/CanvasEngine.ts`**
+  ```text
+  
+> boojy-design@0.4.0 typecheck /Users/tyrbujac/Documents/Projects/boojy/boojy-design
+> tsc -b --noEmit
+
+src/editor/Canvas/engine/CanvasEngine.ts(1192,5): error TS2304: Cannot find name 'stampInto'.
+src/editor/Canvas/engine/CanvasEngine.ts(1200,5): error TS2304: Cannot find name 'compositeStroke'.
+ ELIFECYCLE  Command failed with exit code 2.
+  ```
+- [ ] **Fix TypeScript Typecheck Failure in `/Users/tyrbujac/Documents/Projects/boojy/boojy-design/src/editor/Canvas/engine/CanvasEngine.ts`**
+  ```text
+  
+> boojy-design@0.4.0 typecheck /Users/tyrbujac/Documents/Projects/boojy/boojy-design
+> tsc -b --noEmit
+
+src/editor/Canvas/engine/CanvasEngine.ts(3,3): error TS6133: 'compositeOp' is declared but its value is never read.
+src/editor/Canvas/engine/CanvasEngine.ts(4,3): error TS6133: 'hardnessStops' is declared but its value is never read.
+src/editor/Canvas/engine/CanvasEngine.ts(8,3): error TS6133: 'strokeAlpha' is declared but its value is never read.
+src/editor/Canvas/engine/CanvasEngine.ts(1199,5): error TS2304: Cannot find name 'stampInto'.
+  ```
+- [ ] **Fix TypeScript Typecheck Failure in `/Users/tyrbujac/Documents/Projects/boojy/boojy-design/src/editor/Canvas/engine/CanvasEngine.ts`**
+  ```text
+  
+> boojy-design@0.4.0 typecheck /Users/tyrbujac/Documents/Projects/boojy/boojy-design
+> tsc -b --noEmit
+
+src/editor/Canvas/engine/CanvasEngine.ts(3,3): error TS6133: 'compositeOp' is declared but its value is never read.
+src/editor/Canvas/engine/CanvasEngine.ts(4,3): error TS6133: 'hardnessStops' is declared but its value is never read.
+src/editor/Canvas/engine/CanvasEngine.ts(8,3): error TS6133: 'strokeAlpha' is declared but its value is never read.
+src/editor/Canvas/engine/CanvasEngine.ts(1199,5): error TS2304: Cannot find name 'stampInto'.
+  ```
 - [ ] **Fix TypeScript Typecheck Failure in `/Users/tyrbujac/Documents/Projects/boojy/boojy-design/src/editor/Canvas/engine/CanvasEngine.ts`**
   ```text
   
