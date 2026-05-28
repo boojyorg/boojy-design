@@ -74,7 +74,7 @@ Shipped features (MVP cap = 8 features — the discipline lever, not a hard limi
 * **Eyedropper** — samples composited colour under cursor into foreground, then snaps back to the previous tool.
 * **Fill bucket** — contiguous flood fill with tolerance; composites under anti-aliased edges ("fill behind") to avoid a fringe ring.
 * **Move / free transform** — non-destructive 8-handle box (scale, rotate, move); transforms live in the engine, pixels never move in their buffer. Drag past opposite edge = mirror; Flip H/V buttons mirror in place. Arrow-key nudge. Auto-selects the topmost non-transparent layer on click.
-* **Marquee** (`M`) — rectangular region selection with marching-ants animation; ⌘C copy / ⌘X cut / ⌫ delete / ⌘V paste-as-new-layer; transform-aware copy/clear via `copyRegion`/`clearRegion` in `selection.ts`; clipboard canvas is caller-allocated.
+* **Marquee** (`M`) — rectangular region selection with marching-ants animation; ⌘C copy / ⌘X cut / ⌫ delete / ⌘V paste-as-new-layer; **Flip H/V** buttons in the top bar (enabled when a selection exists); **drag-to-float** cuts selected pixels to a temp overlay, drops as a new "Floated" layer on release (tool auto-switches to Move, handles appear immediately, both steps undoable); transform-aware copy/clear/flip via `copyRegion`/`clearRegion`/`flipRegion` in `selection.ts`; clipboard canvas is caller-allocated.
 * **Layers** — drag-reorder, rename, duplicate-with-pixels, delete, live thumbnails. Pinned locked **Background** layer at the bottom.
 * **Unified undo/redo** — one `Command` stack for strokes and every layer op, including undo-delete with pixels.
 * **Persistence** — save/open `.design` (JSON + per-layer base64 PNG); Export PNG (flattened); Image import.
