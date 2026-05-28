@@ -29,6 +29,7 @@ export interface DocumentState {
   /** Insert a pasted raster layer at the top of the stack and make it active. Uses a
    *  caller-supplied id so the chrome can pre-stash pixels against it before the sync. */
   pasteLayer: (newId: string, name: string) => void
+  setLayerOpacity: (id: string, opacity: number) => void
 }
 
 /** The serialisable document slice — what persistence saves and what undo's mementos
@@ -129,4 +130,9 @@ export const useDocumentStore = create<DocumentState>()((set) => ({
       const layer: Layer = { id: newId, name, type: "raster", visible: true, opacity: 100 }
       return { layers: [layer, ...s.layers], activeLayerId: layer.id }
     }),
+
+  setLayerOpacity: (id, opacity) =>
+    set((s) => ({
+      layers: s.layers.map((l) => (l.id === id ? { ...l, opacity: Math.round(opacity) } : l)),
+    })),
 }))

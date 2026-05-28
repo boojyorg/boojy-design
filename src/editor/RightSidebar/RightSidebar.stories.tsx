@@ -26,6 +26,8 @@ const meta = {
     onRenameLayer: noop,
     onDuplicateLayer: noop,
     onMoveLayer: noop,
+    onLiveLayerOpacity: noop,
+    onCommitLayerOpacity: noop,
   },
   decorators: [(Story) => <div className="flex h-[620px] justify-end bg-editor">{Story()}</div>],
 } satisfies Meta<typeof RightSidebar>

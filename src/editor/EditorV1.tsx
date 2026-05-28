@@ -35,6 +35,7 @@ export function EditorV1() {
   const addLayer = useDocumentStore((s) => s.addLayer)
   const renameLayer = useDocumentStore((s) => s.renameLayer)
   const moveLayer = useDocumentStore((s) => s.moveLayer)
+  const setLayerOpacity = useDocumentStore((s) => s.setLayerOpacity)
   const canUndo = useUndoStore((s) => s.canUndo)
   const canRedo = useUndoStore((s) => s.canRedo)
   const record = useUndoStore((s) => s.record)
@@ -272,6 +273,15 @@ export function EditorV1() {
             onMoveLayer={(id, toIndex) =>
               runUndoable("reorder layer", () => moveLayer(id, toIndex), record)
             }
+            onLiveLayerOpacity={(id, opacity) => setLayerOpacity(id, opacity)}
+            onCommitLayerOpacity={(id, before, after) => {
+              if (before !== after)
+                record({
+                  label: "set opacity",
+                  undo: () => setLayerOpacity(id, before),
+                  redo: () => setLayerOpacity(id, after),
+                })
+            }}
           />
         </div>
       </div>
