@@ -116,3 +116,9 @@ Full history in [CHANGELOG.md](./CHANGELOG.md).
 - **Known limits:** naive single-composite render with a 50-layer cap; memory ceiling unvalidated
   (~800 MB estimated at 50 × 2K); tiling / dirty-rect tracking deferred; transforms cover
   scale + rotate + flip; skew deferred.
+
+## License
+
+Boojy Design is licensed under the **GNU General Public License v3.0** — see [LICENSE](LICENSE).
+
+Copyright (c) 2025–2026 Tyr Bujac
