@@ -1,4 +1,4 @@
-import type { Page } from "@playwright/test"
+import type { Locator, Page } from "@playwright/test"
 
 // Deterministic replay of the multi-tool "smiley face" composition documented in
 // tests/UI_UX_SPEC.md → "Verified interaction loop — multi-tool composition". Reproducing the
@@ -19,10 +19,18 @@ async function stamp(page: Page, x: number, y: number) {
   await page.mouse.up()
 }
 
-export async function drawSmiley(page: Page) {
+/**
+ * Replays the smiley composition and returns the `canvas-stage` element locator — the centre
+ * editor column (the Konva host + grid, between the rails, below the top bar). Callers screenshot
+ * *that element*, not the whole viewport, so chrome churn (toolbar/panel restyles) can't move the
+ * pixels under regression. The replay coordinates are still viewport-absolute, so this only lines
+ * up at the pinned 1920×1080 viewport.
+ */
+export async function drawSmiley(page: Page): Promise<Locator> {
   await page.goto("/")
   // Wait for the engine's stage to mount before plotting any coordinates against it.
-  await page.getByTestId("canvas-stage").waitFor({ state: "visible" })
+  const canvas = page.getByTestId("canvas-stage")
+  await canvas.waitFor({ state: "visible" })
   await page.waitForTimeout(300) // let fit-to-screen settle to 75%.
 
   // 1. Face — Shape → Ellipse, dragged bbox (694,416)→(994,716) in default amber on Layer 1.
@@ -77,4 +85,6 @@ export async function drawSmiley(page: Page) {
   // 6. Park the cursor off-canvas so the live brush hover-ring doesn't leak into the capture.
   await page.mouse.move(1750, 750)
   await page.waitForTimeout(250)
+
+  return canvas
 }

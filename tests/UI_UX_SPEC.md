@@ -8,12 +8,16 @@ app actually does*, not the source — pair it with `CLAUDE.md`/`README.md` for 
 - **Viewport:** 1920×1080.
 - **Baseline artifacts:**
   - [`visual-snapshots/baseline-composition-master.png`](visual-snapshots/baseline-composition-master.png) — layer-order compositing
-  - [`visual-snapshots/smiley-face-master.png`](visual-snapshots/smiley-face-master.png) — multi-tool composition (Shape→Ellipse + brush)
+  - [`visual-snapshots/smiley-face-master.png`](visual-snapshots/smiley-face-master.png) — multi-tool
+    composition (Shape→Ellipse + brush), cropped to the **canvas column** (1576×1028, not full-frame)
 - **Automated check:** `pnpm test:visual` ([`visual/smiley-face.spec.ts`](visual/smiley-face.spec.ts) +
   [`visual/draw-smiley.ts`](visual/draw-smiley.ts)) replays the smiley sequence below in real headless
-  Chromium and pixel-diffs the frame against `smiley-face-master.png` with a <1% tolerance (observed
-  drift ≈0.08%, pure anti-aliasing). The replay coordinates are the same absolute viewport pixels
-  documented here, so they stay valid only at the pinned 1920×1080 viewport.
+  Chromium and pixel-diffs **the `canvas-stage` element** (centre editor column, not the whole
+  viewport — so toolbar/panel restyles can't break it) against `smiley-face-master.png` with a <1%
+  tolerance. Because the master is captured by the same headless engine, run-to-run drift is ~0%.
+  The replay coordinates are still viewport-absolute, so they stay valid only at the pinned 1920×1080
+  viewport. Regenerate the master after an intentional canvas change with
+  `UPDATE_MASTER=1 pnpm test:visual` (review the new PNG before committing).
 
 ## Editor shell (V1 "Classic")
 

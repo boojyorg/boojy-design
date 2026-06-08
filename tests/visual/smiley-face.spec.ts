@@ -8,11 +8,17 @@ import { drawSmiley } from "./draw-smiley"
 // Visual regression: replay the smiley-face composition live, then diff the resulting frame
 // against the committed master. A pass means the engine still paints the same multi-tool result
 // (Shape→Ellipse + brush eyes/smile, composited over layers). See tests/UI_UX_SPEC.md.
+//
+// The capture is scoped to the `canvas-stage` ELEMENT (centre editor column), not the whole
+// viewport — so a toolbar/panel restyle outside the canvas can't break this test. The master is a
+// canvas-only PNG; regenerate it with `UPDATE_MASTER=1 pnpm test:visual` after an intentional
+// canvas change (review the new PNG before committing).
 
 const MASTER = fileURLToPath(new URL("../visual-snapshots/smiley-face-master.png", import.meta.url))
 const DIFF_OUT = fileURLToPath(
   new URL("../../.playwright-screenshots/smiley-face-diff.png", import.meta.url),
 )
+const UPDATE_MASTER = Boolean(process.env.UPDATE_MASTER)
 
 // Tolerance: allow <1% of pixels to differ. pixelmatch's per-pixel `threshold` (0–1) absorbs
 // anti-aliasing jitter so only genuine pixel changes count toward the ratio.
@@ -20,11 +26,19 @@ const MAX_DIFF_RATIO = 0.01
 const AA_THRESHOLD = 0.1
 
 test("smiley-face composition matches the stored master within 1%", async ({ page }) => {
-  await drawSmiley(page)
+  const canvas = await drawSmiley(page)
 
-  // Full-viewport capture to match the master's frame (1920×1080). PNG buffer, no file written
-  // on the happy path — we only persist a diff when the assertion fails.
-  const shot = PNG.sync.read(await page.screenshot())
+  // Element-scoped capture (canvas column only). PNG buffer; on the happy path nothing is written
+  // to disk — we persist a diff only on failure, or overwrite the master under UPDATE_MASTER.
+  const shotBuf = await canvas.screenshot()
+
+  if (UPDATE_MASTER) {
+    writeFileSync(MASTER, shotBuf)
+    test.info().annotations.push({ type: "update-master", description: MASTER })
+    return
+  }
+
+  const shot = PNG.sync.read(shotBuf)
   const master = PNG.sync.read(readFileSync(MASTER))
 
   expect(
