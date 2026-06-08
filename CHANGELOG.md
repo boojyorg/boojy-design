@@ -7,7 +7,13 @@ the `.design` file-format version is tracked separately in `src/lib/designFile.t
 
 ## [Unreleased]
 
-_Nothing yet._
+### Added
+
+- **Visual-regression test** (`pnpm test:visual`) — a Playwright runner that replays the
+  documented smiley-face composition in real headless Chromium and pixel-diffs the rendered frame
+  against `tests/visual-snapshots/smiley-face-master.png` with a <1% tolerance (anti-aliasing
+  jitter only; observed drift ≈0.08%). Separate from the Vitest gate and not run in CI — it needs
+  a dev server and a browser download — so run it locally for canvas/engine/visual changes.
 
 ## [0.4.0] — 2026-05-28
 

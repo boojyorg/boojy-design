@@ -9,6 +9,11 @@ app actually does*, not the source — pair it with `CLAUDE.md`/`README.md` for 
 - **Baseline artifacts:**
   - [`visual-snapshots/baseline-composition-master.png`](visual-snapshots/baseline-composition-master.png) — layer-order compositing
   - [`visual-snapshots/smiley-face-master.png`](visual-snapshots/smiley-face-master.png) — multi-tool composition (Shape→Ellipse + brush)
+- **Automated check:** `pnpm test:visual` ([`visual/smiley-face.spec.ts`](visual/smiley-face.spec.ts) +
+  [`visual/draw-smiley.ts`](visual/draw-smiley.ts)) replays the smiley sequence below in real headless
+  Chromium and pixel-diffs the frame against `smiley-face-master.png` with a <1% tolerance (observed
+  drift ≈0.08%, pure anti-aliasing). The replay coordinates are the same absolute viewport pixels
+  documented here, so they stay valid only at the pinned 1920×1080 viewport.
 
 ## Editor shell (V1 "Classic")
 

@@ -19,6 +19,7 @@ Two things that still shape any change:
 pnpm dev              # run the editor (Vite)
 pnpm test             # Vitest run — both projects (dom = jsdom, node = real-canvas pixel)
 pnpm test:watch       # Vitest watch
+pnpm test:visual      # Playwright visual-regression — live headless Chromium vs stored master PNG
 pnpm test:coverage    # Vitest run with v8 coverage (no enforced threshold)
 pnpm typecheck        # tsc -b --noEmit (type-check only; also the pre-commit gate)
 pnpm lint             # Biome check (lint + format + import order)
@@ -35,7 +36,7 @@ CI runs lint + test + build + build-storybook, then deploys to Cloudflare Pages 
 General branch discipline + release flow → root `CLAUDE.md`. Local gates: `pnpm test`, `pnpm typecheck`, `pnpm lint` (+ `pnpm build` for non-trivial changes). Three load-bearing rules on top:
 
 * **CI-green is the gate, not local `pnpm test`.** CI also runs build + build-storybook; a change can pass `pnpm test` yet fail CI on a lint nit or Storybook break.
-* **Canvas / engine / visual features need a `pnpm dev` walkthrough *before* merge.** The engine no-ops under jsdom, so automated tests cover pure logic but never live drag, paint, or render.
+* **Canvas / engine / visual features need a `pnpm dev` walkthrough *before* merge.** The engine no-ops under jsdom, so Vitest covers pure logic but never live drag, paint, or render. `pnpm test:visual` (Playwright, `tests/visual/`) now *automates the regression half* — it replays the documented smiley-face sequence in real headless Chromium and pixel-diffs the frame against `tests/visual-snapshots/smiley-face-master.png` (<1% budget). It needs a dev server (reuses your `:5173`, else spawns one) + the Chromium download, so it's **not in CI** and **not in `pnpm test`** — run it locally for canvas changes. It catches *regressions of the known composition*; a genuinely new visual still needs the manual walkthrough (and a fresh master).
 * **Stack PRs that touch the same file.** When a milestone needs several single-concern PRs that edit the same module or the docs (e.g. the quality pass: #26→#27→#28), branch each off the previous and stack them — parallel branches off `main` collide on that file. Retarget each base down to `main` as the one below it squash-merges.
   * **Merging a stack — order matters, and don't `--delete-branch` early.** Deleting a PR's base branch **auto-closes** any child PR stacked on it (and a closed PR can't be reopened once its base is gone). So either (a) retarget every child's base to `main` *first*, then merge bottom-up, or (b) merge bottom-up and only `--delete-branch` once nothing is stacked on it. After each squash-merge, the merged work lands on `main` as a *new* commit, so rebase the next branch with `git rebase --onto main <old-base-sha>` before its PR (otherwise its diff re-shows the lower changes). Learned the hard way: a careless `--delete-branch` on #26 closed #27/#28 and forced reopening them as #29/#30.
 
