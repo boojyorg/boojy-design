@@ -29,3 +29,6 @@ storybook-static
 
 # Claude Code — personal per-project overrides (settings.json is shared/committed)
 .claude/settings.local.json
+
+# Playwright MCP scratch output (transient snapshots/console logs)
+.playwright-screenshots/
