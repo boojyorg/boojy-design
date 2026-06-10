@@ -6,10 +6,14 @@
 
 ## 🎯 Active Engineering Target — MVP complete (v0.4.0); next = engine stateful tail / CanvasStage split
 
-**Status (2026-05-29):** MVP is complete and on `main` (live text layers + layer opacity, v0.4.0).
+**Status (2026-06-09):** MVP is complete and on `main` (live text layers + layer opacity, v0.4.0).
 The post-MVP structure & quality pass shipped (engine pure/ctx-taking split, lint warnings cleared,
-Konva vendor chunk, `DEFAULT_TEXT_COLOR` dedupe — see `git log` / `CHANGELOG.md`). No target is
-currently in flight. The two candidate next milestones below each need a plan-mode pass before starting.
+Konva vendor chunk, `DEFAULT_TEXT_COLOR` dedupe — see `git log` / `CHANGELOG.md`). The 2026-06-08
+architecture & visual review is done — findings triaged into `docs/BACKLOG.md` (incl. 2 high-priority
+correctness items: text-undo gaps, unbounded layer memory); report in
+`docs/reviews/2026-06-08-architecture-visual-review.md`. No target is currently in flight. The two
+candidate next milestones below each need a plan-mode pass before starting; the review findings
+should feed that triage.
 
 ### Next targets (each its own milestone — plan-mode first)
 

@@ -16,6 +16,16 @@ the `.design` file-format version is tracked separately in `src/lib/designFile.t
   self-captured). Regenerate the master with `UPDATE_MASTER=1 pnpm test:visual`. Separate from the
   Vitest gate and not run in CI — it needs a dev server and a browser download — so run it locally
   for canvas/engine/visual changes.
+- **Playwright MCP server** for browser-driven UX testing — lets the editor be driven live
+  (click, drag, screenshot) during development; produced the observed UI/UX spec
+  (`tests/UI_UX_SPEC.md`) and the visual-test baselines.
+- **`FEATURES.md`** — a plain-language feature tour of the editor (ASCII mockups, no source
+  paths), linked from the README.
+
+### Changed
+
+- **License: GPLv3** — the project is now distributed under the GNU General Public License v3.0
+  (see `LICENSE`).
 
 ## [0.4.0] — 2026-05-28
 

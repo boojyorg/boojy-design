@@ -6,7 +6,7 @@ context-hygiene, working prefs); this file is the app-specific architecture, sta
 
 ## What this is (read first)
 
-Boojy Design is a web image editor built on the V1 "Classic" shell (top bar, left tool rail, canvas, right sidebar). The app is tagged **v0.4.0** — see `CHANGELOG.md`. **v0.4.0 is the MVP cap and MVP is now complete** — live text layers shipped (walkthrough passed, merged). Post-MVP items (see `docs/ROADMAP.md` + `docs/BACKLOG.md`) need a fresh milestone plan before starting.
+Boojy Design is a web image editor built on the V1 "Classic" shell (top bar, left tool rail, canvas, right sidebar). The app is tagged **v0.4.0** — see `CHANGELOG.md`. **v0.4.0 is the MVP cap and MVP is now complete** — live text layers shipped (walkthrough passed, merged). Post-MVP items (see `docs/ROADMAP.md` + `docs/BACKLOG.md`) need a fresh milestone plan before starting; the 2026-06-08 architecture & visual review (`docs/reviews/2026-06-08-architecture-visual-review.md`) logged the findings — including two high-priority correctness items (text-undo gaps, unbounded layer memory) — into `docs/BACKLOG.md`, and should feed that triage.
 
 Two things that still shape any change:
 

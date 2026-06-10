@@ -27,8 +27,8 @@ Four regions, matching the documented shell split:
 | --- | --- |
 | **TopBar** (`banner`) | Logo / doc menu, document title + unsaved dot, Undo/Redo, zoom controls (`Zoom out`, `Fit to screen` %, `Zoom in`), the active tool's quick params (Size / Hardness / Opacity / Color for Paint), and a `Hide panels` toggle. |
 | **LeftRail** (`navigation "Tools"`) | Move (V), Marquee (M), Paint (B), Eraser (E), Fill (G), Shape (R), Eyedropper (I), Text (T), Hand (H). Below: Foreground / Secondary colour swatches + a swap-colours button. |
-| **Canvas** | The Konva stage. At 75% fit, the document occupied ~`(364,266)`–`(1322,866)` in the 1920×1080 viewport; document centre ≈ `(844,566)`. |
-| **RightSidebar** | **Properties** (tool-specific: Flow / Spacing / Pressure / Stabilize / Blend for Paint) and **Layers** (per-layer opacity slider, the layer stack `list`, and `Add layer` / `Duplicate layer` / `Delete layer` buttons at the bottom). |
+| **Canvas** | The Konva stage. The editor initialises at a **static 75% zoom (nothing auto-fits)**; at that zoom the document occupied ~`(364,266)`–`(1322,866)` in the 1920×1080 viewport; document centre ≈ `(844,566)`. |
+| **RightSidebar** | **Properties** (static/decorative — *not* tool-specific; Paint's Size / Hardness / Opacity quick-params live in the TopBar) and **Layers** (per-layer opacity slider, the layer stack `list`, and `Add layer` / `Duplicate layer` / `Delete layer` buttons at the bottom). |
 
 ### Accessibility surface (good)
 - Tools expose `button` roles with `"<Name> (<shortcut>)"` accessible names and a `pressed` state on the active tool.
@@ -90,13 +90,16 @@ eyes+smile, confirming each draws onto the active layer.
   observed at ~`(95,542)` and `(95,590)` but treat that as incidental.
 - **Discrete brush stamps need a 1px nudge** — a zero-distance `mouse.down()`→`mouse.up()` can
   fail to register a stamp. After `down()`, do a tiny `move(x+1, y+1, {steps:2})` before `up()`
-  so a single-click dot reliably paints (used for the eyes).
+  so a single-click dot reliably paints (used for the eyes). This is a **Playwright pointer
+  quirk**, not an engine limit — the engine stamps on pointer-down.
+- **Eyedropper samples the white-backed composite** — transparent pixels read as white, not as
+  the layer's raw alpha.
 - **Reset the cursor off-canvas before the final screenshot** — the brush renders a live hover-ring
   outline at the pointer, which leaks into captures (it appeared at the smile's end-point). Move the
   mouse to a neutral chrome area (e.g. `(1750,750)`) and wait ~200ms before `take_screenshot` for a
   clean baseline.
-- **Layer reorder needs a drag-activation nudge** — begin the drag, make a small (~7px) initial
-  move to trip the drag threshold, then move to the target row before releasing. Verify the
+- **Layer reorder needs a drag-activation nudge** — begin the drag, make a small (4px — dnd-kit
+  `distance: 4`) initial move to trip the drag threshold, then move to the target row before releasing. Verify the
   outcome by reading the `aria-label`s of the `[role="option"]` rows, not by pixels alone.
 - **Port may differ.** `pnpm dev` falls back off `5173` if it's in use (observed `5174`); read the
   Vite banner for the actual URL.
