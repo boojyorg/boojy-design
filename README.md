@@ -117,6 +117,12 @@ Full history in [CHANGELOG.md](./CHANGELOG.md).
   (~800 MB estimated at 50 × 2K); tiling / dirty-rect tracking deferred; transforms cover
   scale + rotate + flip; skew deferred.
 
+## Contributing
+
+Boojy Design is in **Early Access** and isn't accepting pull requests yet — contributions will
+open with the v1.0 release. **Bug reports and feedback are very welcome** — see
+[CONTRIBUTING.md](CONTRIBUTING.md).
+
 ## License
 
 Boojy Design is licensed under the **GNU General Public License v3.0** — see [LICENSE](LICENSE).
