@@ -101,7 +101,8 @@ First tagged release: the V1 "Classic" shell plus a working MVP paint loop on th
   the Hand tool to pan, a Chrome-like preset zoom ladder on the +/- controls, and ⌘0 fit / ⌘1 100%.
 - **App version** — shown in the Design menu under "About Boojy Design".
 
-[Unreleased]: https://github.com/tyrbujac/boojy-design/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/tyrbujac/boojy-design/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/tyrbujac/boojy-design/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/tyrbujac/boojy-design/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/tyrbujac/boojy-design/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/tyrbujac/boojy-design/compare/v0.1.0...v0.2.0
