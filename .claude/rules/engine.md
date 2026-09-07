@@ -5,7 +5,7 @@ paths:
 
 # Engine gotchas (Konva canvas + CanvasStage)
 
-> Load-bearing rules for the canvas seam — migrated out of the old `dreams.md` §3 so they
+> Load-bearing rules for the canvas seam — migrated out of the since-deleted `dreams.md` so they
 > survive in git. Architecture overview is in `CLAUDE.md`; this is the per-edit footgun list.
 > (Note: `paths:` conditional loading is unreliable in early-2026 Claude Code — treat this as
 > organization, not guaranteed context savings.)

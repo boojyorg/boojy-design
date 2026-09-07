@@ -7,7 +7,7 @@ architecture, stack, and gotchas.
 
 ## What this is (read first)
 
-Boojy Design is a web image editor built on the V1 "Classic" shell (top bar, left tool rail, canvas, right sidebar). The app is tagged **v0.4.0** — see `CHANGELOG.md`. **v0.4.0 is the MVP cap and MVP is now complete** — live text layers shipped (walkthrough passed, merged). Post-MVP items (see `docs/ROADMAP.md` + `docs/BACKLOG.md`) need a fresh milestone plan before starting.
+Boojy Design is a web image editor built on the V1 "Classic" shell (top bar, left tool rail, canvas, right sidebar). The app is tagged **v0.4.0** — see `CHANGELOG.md`. **v0.4.0 is the MVP cap and MVP is now complete** — live text layers shipped (walkthrough passed, merged). Development is currently paused; `docs/BACKLOG.md` is the one planning file and holds what comes next, each item needing a fresh milestone plan before starting.
 
 Two things that still shape any change:
 
@@ -56,7 +56,7 @@ General branch discipline + release flow → suite root conventions. Local gates
 * **Radix needs polyfills under jsdom.** `vitest.setup.ts` stubs `ResizeObserver` and pointer-capture APIs.
 * **Tests target accessible queries** (roles, `aria-label`, `data-testid`). Prefer those over brittle DOM-shape assertions.
 * **Bundle (Vite 8 = rolldown):** Konva is isolated into its own vendor chunk via `build.rollupOptions.output.manualChunks` in `vite.config.ts` (keeps both chunks under the 500 KB warn limit; cache survives app-code redeploys). `manualChunks` still works under rolldown — no need for the `rolldownOptions`/`advancedChunks` API the warning suggests.
-* **`FEATURES.md`** is the plain-language, recruiter/user-facing feature tour (ASCII mockups, no `src/` paths) — jargon-free; internals belong in `README.md`/`AGENTS.md`. When a feature ships, update **both** `FEATURES.md` (prose) and `docs/FEATURE_TRACKER.md` (status). (General keep-docs-current rule → suite root.)
+* **`FEATURES.md`** is the plain-language, recruiter/user-facing feature tour (ASCII mockups, no `src/` paths) — jargon-free; internals belong in `README.md`/`AGENTS.md`. When a feature ships, update `FEATURES.md` (prose) and the README feature list, and remove it from `docs/BACKLOG.md`. (General keep-docs-current rule → suite root.)
 * **App version** is `__APP_VERSION__` (Vite `define` from `package.json`) — distinct from the `.design` file-format version in `designFile.ts`.
 * **`viewportStore.zoom` is a percentage (0–100+), not a fraction (0–1).** Any screen-space scaling must use `zoom / 100`. Using `zoom` directly inflates sizes by 100×.
 
