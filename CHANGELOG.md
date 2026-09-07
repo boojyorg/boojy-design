@@ -7,7 +7,11 @@ the `.design` file-format version is tracked separately in `src/lib/designFile.t
 
 ## [Unreleased]
 
-_Nothing yet._
+### Docs
+- **Status is now "working preview, development currently paused"** (`README.md`), matching the
+  label on boojy.org. CI badge points at the `boojyorg` org.
+- **Contribution policy simplified** (`CONTRIBUTING.md`, `README.md`): personal project, no
+  external code contributions, feedback and bug reports by email to tyr@boojy.org.
 
 ## [0.4.0] — 2026-05-28
 
