@@ -4,7 +4,7 @@ set -euo pipefail
 # =========================================================================
 # ⚙️ PostToolUse gate — runs on every .ts/.tsx edit.
 # Biome auto-fix → typecheck → vitest related. On failure: print to stderr,
-# exit non-zero. (Auto memory now owns learnings; this no longer writes dreams.md.)
+# exit non-zero. (Auto memory now owns learnings; this never writes to any doc.)
 # =========================================================================
 JSON_INPUT=$(cat)
 FILE_PATH=$(echo "$JSON_INPUT" | jq -r '.tool_input.file_path // .tool_input.path // ""')

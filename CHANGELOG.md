@@ -8,6 +8,9 @@ the `.design` file-format version is tracked separately in `src/lib/designFile.t
 ## [Unreleased]
 
 ### Docs
+- **Planning files pruned.** `dreams.md`, `docs/ROADMAP.md` and `docs/FEATURE_TRACKER.md` are gone;
+  the two next refactors, the open tasks and the deferred-feature list now live in
+  `docs/BACKLOG.md`, the one planning file.
 - **Status is now "working preview, development currently paused"** (`README.md`), matching the
   label on boojy.org. CI badge points at the `boojyorg` org.
 - **Contribution policy simplified** (`CONTRIBUTING.md`, `README.md`): personal project, no
