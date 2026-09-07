@@ -1,6 +1,6 @@
 # Boojy Design — web image editor
 
-[![CI](https://github.com/tyrbujac/boojy-design/actions/workflows/ci.yml/badge.svg)](https://github.com/tyrbujac/boojy-design/actions/workflows/ci.yml)
+[![CI](https://github.com/boojyorg/boojy-design/actions/workflows/ci.yml/badge.svg)](https://github.com/boojyorg/boojy-design/actions/workflows/ci.yml)
 [![version](https://img.shields.io/badge/version-0.4.0-E89940)](./CHANGELOG.md)
 
 A web image editor built on the **V1 "Classic"** layout: top bar, left tool rail, canvas, and a
@@ -9,10 +9,8 @@ collapsible right sidebar.
 > 📖 New here? **[FEATURES.md](./FEATURES.md)** is a plain-language tour of what the app can do
 > (with ASCII mockups of the UI) — read that to get a feel for Boojy Design without running it.
 
-> **Status: active side-project (v0.4.0 — MVP complete).** The UI shell is live and the design
-> direction is confirmed. The Konva canvas engine has landed and the full MVP loop works — paint,
-> shapes, fill, layers (with opacity), transform, selection, live text, undo/redo, import/export,
-> and `.design` save/open — all behind a clean seam (`CanvasStage` → `Canvas/engine/`).
+> **Status: working preview, development currently paused (v0.4.0).** The app works and is
+> live at [design.boojy.org](https://design.boojy.org).
 
 ## Features
 
@@ -119,9 +117,9 @@ Full history in [CHANGELOG.md](./CHANGELOG.md).
 
 ## Contributing
 
-Boojy Design is in **Early Access** and isn't accepting pull requests yet — contributions will
-open with the v1.0 release. **Bug reports and feedback are very welcome** — see
-[CONTRIBUTING.md](CONTRIBUTING.md).
+Boojy Design is a personal project and isn't accepting code contributions or pull requests right now.
+Feedback and bug reports are welcome by email at [tyr@boojy.org](mailto:tyr@boojy.org).
+See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
